@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Skin Library</title>
+<meta name="description" content="Personal Minecraft skin library in your browser: collect skins, view them in 3D and draw your own. Everything stays local.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/looks.css">
+<script>
+  // apply the saved look and theme before first paint
+  (function () {
+    var d = document.documentElement, look = "mc";
+    try {
+      var th = localStorage.getItem("skin-library-theme"); if (th === "light" || th === "dark") d.dataset.theme = th;
+      var l = localStorage.getItem("skin-library-look"); if (l) look = l;
+    } catch (e) {}
+    d.dataset.look = look;
+  })();
+</script>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v4h16v-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><path d="M10 3h4l.6 2.6 2.2 1.3 2.6-.8 2 3.4-2 1.9v2.6l2 1.9-2 3.4-2.6-.8-2.2 1.3L14 21h-4l-.6-2.6-2.2-1.3-2.6.8-2-3.4 2-1.9v-2.6l-2-1.9 2-3.4 2.6.8 2.2-1.3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.8l-5.2 2.8 1-5.8-4.3-4.1 5.9-.8z" fill="currentColor"/></symbol>
+  <symbol id="i-star-o" viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.8l-5.2 2.8 1-5.8-4.3-4.1 5.9-.8z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-left" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M4 20l1-4L16 5l3 3L8 19zM14 7l3 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+  <symbol id="i-eraser" viewBox="0 0 24 24"><path d="M9 20h11M4.5 15.5l9-9 6 6-7.5 7.5H8z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+  <symbol id="i-fill" viewBox="0 0 24 24"><path d="M5 11l7-7 7 7-7 7zM5 11h14M20 15s1.5 2 1.5 3a1.5 1.5 0 01-3 0c0-1 1.5-3 1.5-3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+  <symbol id="i-picker" viewBox="0 0 24 24"><path d="M14 6l4 4M5 19l1-4 8.5-8.5a2.1 2.1 0 013 3L9 18z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5M4 9h10a6 6 0 010 12h-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-redo" viewBox="0 0 24 24"><path d="M15 14l5-5-5-5M20 9H10a6 6 0 000 12h3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</svg>
+
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <img src="favicon.svg" alt="" width="34" height="34">
+      <div>
+        <h1 data-i18n="appName">Skin Library</h1>
+        <p class="tagline" data-i18n="tagline"></p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <button class="btn primary" id="importBtn"><svg class="ic"><use href="#i-upload"/></svg><span data-i18n="import"></span></button>
+      <button class="btn" id="newBtn"><svg class="ic"><use href="#i-plus"/></svg><span data-i18n="newSkin"></span></button>
+      <button class="btn icon-only" id="settingsBtn" data-i18n-title="settings"><svg class="ic"><use href="#i-gear"/></svg></button>
+    </div>
+  </header>
+
+  <div class="toolbar" id="toolbar">
+    <label class="search"><span class="sr" data-i18n="search"></span><input type="search" id="searchInput" data-i18n-ph="searchPh" autocomplete="off"></label>
+    <div class="tool-group"><span class="seg-label" data-i18n="view"></span>
+      <span class="seg" id="viewSeg"><button data-v="front" id="view-front" data-i18n="front"></button><button data-v="back" id="view-back" data-i18n="back"></button><button data-v="tex" id="view-tex" data-i18n="texture"></button></span></div>
+    <div class="tool-group"><span class="seg-label" data-i18n="arms"></span>
+      <span class="seg" id="filterSeg"><button data-v="all" id="filter-all" data-i18n="all"></button><button data-v="slim" id="filter-slim" data-i18n="slim"></button><button data-v="classic" id="filter-classic" data-i18n="classic"></button><button data-v="fav" id="filter-fav" data-i18n-title="favorites"><svg class="ic sm"><use href="#i-star"/></svg></button></span></div>
+    <label class="tool-group"><span class="seg-label" data-i18n="sort"></span>
+      <select id="sortSelect"><option value="new" data-i18n="sortNew"></option><option value="old" data-i18n="sortOld"></option><option value="name" data-i18n="sortName"></option></select></label>
+    <span class="count" id="countLabel" aria-live="polite"></span>
+  </div>
+
+  <main>
+    <section class="empty" id="emptyState" hidden>
+      <div class="drop-art" aria-hidden="true"><canvas id="emptyFigure" width="16" height="32"></canvas></div>
+      <h2 data-i18n="emptyTitle"></h2>
+      <p data-i18n="emptyText"></p>
+      <div class="row center">
+        <button class="btn primary" id="emptyImportBtn"><svg class="ic"><use href="#i-upload"/></svg><span data-i18n="chooseFiles"></span></button>
+        <button class="btn" id="emptyNewBtn"><svg class="ic"><use href="#i-pencil"/></svg><span data-i18n="drawFirst"></span></button>
+      </div>
+    </section>
+    <p class="no-match" id="noMatch" hidden data-i18n="noMatch"></p>
+    <div class="grid" id="grid"></div>
+  </main>
+
+  <footer class="foot">
+    <span data-i18n="footer"></span>
+    <a href="https://github.com/oberortm/minecraft-skin-library" target="_blank" rel="noopener" data-i18n="sourceCode"></a>
+  </footer>
+</div>
+
+<div class="drop-overlay" id="dropOverlay" hidden><div><svg class="ic xl"><use href="#i-upload"/></svg><p data-i18n="dropHere"></p></div></div>
+<input type="file" id="fileInput" accept="image/png" multiple hidden>
+<input type="file" id="backupInput" accept=".json,application/json" hidden>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<!-- Settings -->
+<dialog id="settings" class="sheet narrow" aria-labelledby="sTitle">
+  <div class="sheet-inner">
+    <div class="sheet-top">
+      <h2 class="sheet-title" id="sTitle" data-i18n="settings"></h2>
+      <span class="spacer"></span>
+      <button class="btn icon-only" id="sClose" data-i18n-title="close"><svg class="ic"><use href="#i-x"/></svg></button>
+    </div>
+    <section class="set-block">
+      <h3 data-i18n="look"></h3>
+      <div class="looks" id="lookList" role="radiogroup">
+        <button class="look-opt" role="radio" data-look="mc" id="look-mc"><span class="look-sw mc"><i></i><i></i><i></i></span><b data-i18n="lookMc"></b><small data-i18n="lookMcDesc"></small></button>
+        <button class="look-opt" role="radio" data-look="album" id="look-album"><span class="look-sw album"><i></i><i></i><i></i></span><b data-i18n="lookAlbum"></b><small data-i18n="lookAlbumDesc"></small></button>
+        <button class="look-opt" role="radio" data-look="workshop" id="look-workshop"><span class="look-sw workshop"><i></i><i></i><i></i></span><b data-i18n="lookWorkshop"></b><small data-i18n="lookWorkshopDesc"></small></button>
+        <button class="look-opt" role="radio" data-look="gallery" id="look-gallery"><span class="look-sw gallery"><i></i><i></i><i></i></span><b data-i18n="lookGallery"></b><small data-i18n="lookGalleryDesc"></small></button>
+        <button class="look-opt" role="radio" data-look="standard" id="look-standard"><span class="look-sw standard"><i></i><i></i><i></i></span><b data-i18n="lookStandard"></b><small data-i18n="lookStandardDesc"></small></button>
+      </div>
+    </section>
+    <section class="set-block">
+      <h3 data-i18n="theme"></h3>
+      <div class="seg wide" id="themeSeg"><button data-v="system" id="theme-system" data-i18n="themeSystem"></button><button data-v="light" id="theme-light" data-i18n="themeLight"></button><button data-v="dark" id="theme-dark" data-i18n="themeDark"></button></div>
+    </section>
+    <section class="set-block">
+      <h3 data-i18n="language"></h3>
+      <div class="seg wide" id="langSeg"><button data-v="de" id="lang-de">Deutsch</button><button data-v="en" id="lang-en">English</button></div>
+    </section>
+    <section class="set-block">
+      <h3 data-i18n="storage"></h3>
+      <p class="hint" data-i18n="storageText"></p>
+      <div class="row">
+        <button class="btn" id="backupExportBtn" data-i18n="backupExport"></button>
+        <button class="btn" id="backupImportBtn" data-i18n="backupImport"></button>
+      </div>
+    </section>
+  </div>
+</dialog>
+
+<!-- Detail -->
+<dialog id="detail" class="sheet" aria-labelledby="dName">
+  <div class="sheet-inner">
+    <div class="sheet-top">
+      <label class="name-field"><span class="sr" data-i18n="nameLabel"></span><input id="dName" maxlength="60" autocomplete="off"></label>
+      <button class="btn icon-only fav" id="dFav" data-i18n-title="fav"><svg class="ic"><use href="#i-star-o"/></svg></button>
+      <span class="badge" id="dModel"></span>
+      <span class="badge" id="dFmt" hidden></span>
+      <span class="spacer"></span>
+      <button class="btn icon-only" id="dPrev" data-i18n-title="prev"><svg class="ic"><use href="#i-left"/></svg></button>
+      <button class="btn icon-only" id="dNext" data-i18n-title="next"><svg class="ic"><use href="#i-right"/></svg></button>
+      <button class="btn icon-only" id="dClose" data-i18n-title="close"><svg class="ic"><use href="#i-x"/></svg></button>
+    </div>
+    <div class="note" id="dLegacy" hidden data-i18n="legacyNote"></div>
+    <div class="sheet-body">
+      <div class="panel">
+        <h3 data-i18n="view3d"></h3>
+        <div class="view3d" id="dView3d"><div class="fallback" id="dFallback" hidden>3D unavailable</div></div>
+        <div class="row">
+          <button class="chip" id="dRot" aria-pressed="true" data-i18n="rotate"></button>
+          <button class="chip" id="dWalk" aria-pressed="false" data-i18n="walk"></button>
+          <button class="chip" id="dOuter" aria-pressed="true" data-i18n="outerLayer"></button>
+        </div>
+        <p class="hint" data-i18n="dragHint"></p>
+        <div class="flat2">
+          <figure><div class="stage"><canvas id="dFront" width="16" height="32"></canvas></div><figcaption data-i18n="front"></figcaption></figure>
+          <figure><div class="stage"><canvas id="dBack" width="16" height="32"></canvas></div><figcaption data-i18n="back"></figcaption></figure>
+        </div>
+      </div>
+      <div class="panel">
+        <h3 data-i18n="textureOriginal"></h3>
+        <div class="texwrap"><canvas id="dTex"></canvas></div>
+        <div class="row"><button class="chip" id="dRegions" aria-pressed="false" data-i18n="regions"></button></div>
+        <div class="row actions">
+          <button class="btn primary" id="dEdit"><svg class="ic"><use href="#i-pencil"/></svg><span data-i18n="edit"></span></button>
+          <button class="btn" id="dExport" data-i18n="exportPng"></button>
+          <button class="btn" id="dDup" data-i18n="duplicate"></button>
+          <button class="btn danger" id="dDelete" data-i18n="delete"></button>
+        </div>
+        <div class="mc-how"><h3 data-i18n="mcHowTitle"></h3><p id="dHow"></p></div>
+        <label class="notes"><h3 data-i18n="notes"></h3><textarea id="dNotes" rows="3" data-i18n-ph="notesPh"></textarea></label>
+        <p class="hint" id="dAdded"></p>
+      </div>
+    </div>
+  </div>
+</dialog>
+
+<!-- Editor -->
+<dialog id="editor" class="editor" aria-labelledby="eName">
+  <div class="ed">
+    <div class="ed-top">
+      <label class="name-field"><span class="sr" data-i18n="nameLabel"></span><input id="eName" maxlength="60" autocomplete="off"></label>
+      <div class="tool-group"><span class="seg-label" data-i18n="model"></span><span class="seg" id="eModel"><button data-v="classic" id="emodel-classic" data-i18n="classic"></button><button data-v="slim" id="emodel-slim" data-i18n="slim"></button></span></div>
+      <span class="spacer"></span>
+      <button class="btn icon-only" id="eUndo" data-i18n-title="undo"><svg class="ic"><use href="#i-undo"/></svg></button>
+      <button class="btn icon-only" id="eRedo" data-i18n-title="redo"><svg class="ic"><use href="#i-redo"/></svg></button>
+      <button class="btn" id="eCancel" data-i18n="cancel"></button>
+      <button class="btn" id="eSaveCopy" data-i18n="saveCopy"></button>
+      <button class="btn primary" id="eSave" data-i18n="save"></button>
+    </div>
+    <div class="discard" id="eDiscard" hidden>
+      <span data-i18n="discardTitle"></span>
+      <button class="btn danger" id="eDiscardYes" data-i18n="discardYes"></button>
+      <button class="btn" id="eDiscardNo" data-i18n="discardNo"></button>
+    </div>
+    <div class="ed-body">
+      <aside class="ed-tools">
+        <h3 data-i18n="tools"></h3>
+        <div class="toolset" id="eTools">
+          <button class="tool" data-tool="pencil" id="tool-pencil" data-i18n-title="pencil" aria-pressed="true"><svg class="ic"><use href="#i-pencil"/></svg><kbd>B</kbd></button>
+          <button class="tool" data-tool="eraser" id="tool-eraser" data-i18n-title="eraser" aria-pressed="false"><svg class="ic"><use href="#i-eraser"/></svg><kbd>E</kbd></button>
+          <button class="tool" data-tool="fill" id="tool-fill" data-i18n-title="fill" aria-pressed="false"><svg class="ic"><use href="#i-fill"/></svg><kbd>G</kbd></button>
+          <button class="tool" data-tool="picker" id="tool-picker" data-i18n-title="picker" aria-pressed="false"><svg class="ic"><use href="#i-picker"/></svg><kbd>I</kbd></button>
+        </div>
+        <h3 data-i18n="color"></h3>
+        <div class="color-row">
+          <input type="color" id="eColor" value="#3b6fe0">
+          <input type="text" id="eHex" value="#3b6fe0" maxlength="7" spellcheck="false" aria-label="Hex">
+        </div>
+        <div class="swatches" id="eRecent" aria-label="recent"></div>
+        <h3 data-i18n="layer"></h3>
+        <span class="seg" id="eLayer"><button data-v="base" id="elayer-base" data-i18n="layerBase"></button><button data-v="outer" id="elayer-outer" data-i18n="layerOuter"></button></span>
+        <div class="checks">
+          <label><input type="checkbox" id="eGrid" checked> <span data-i18n="grid"></span></label>
+          <label><input type="checkbox" id="eRegions"> <span data-i18n="regions"></span></label>
+          <label><input type="checkbox" id="eShowOuter" checked> <span data-i18n="showOuter"></span></label>
+        </div>
+        <p class="hint" data-i18n="baseOpaque"></p>
+      </aside>
+      <div class="ed-canvas">
+        <div class="texwrap paint"><canvas id="eTex" width="640" height="640"></canvas></div>
+      </div>
+      <aside class="ed-preview">
+        <div class="flat2 paintable">
+          <figure><div class="stage"><canvas id="eFront" width="16" height="32"></canvas></div><figcaption data-i18n="front"></figcaption></figure>
+          <figure><div class="stage"><canvas id="eBack" width="16" height="32"></canvas></div><figcaption data-i18n="back"></figcaption></figure>
+        </div>
+        <p class="hint" data-i18n="paintHere"></p>
+        <div class="view3d small" id="eView3d"></div>
+      </aside>
+    </div>
+  </div>
+</dialog>
+
+<script src="vendor/skinview3d/skinview3d.bundle.js"></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

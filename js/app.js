@@ -1,0 +1,438 @@
+import { t, applyI18n, setLang, getLang } from "./i18n.js";
+import { db, newId, askPersist } from "./db.js";
+import { renderFigure, detectModel, loadImage, REGIONS } from "./skin.js";
+import { openEditor, editorOpen } from "./editor.js";
+import { applyLook, savedLook } from "./looks.js";
+
+const $ = id => document.getElementById(id);
+const state = { skins: [], view: "front", filter: "all", sort: "new", search: "", current: null };
+const UI_KEY = "skin-library-ui";
+
+// ---------- small helpers ----------
+export function toast(msg, err = false) {
+  const el = document.createElement("div");
+  el.className = "toast" + (err ? " err" : "");
+  el.textContent = msg;
+  $("toasts").appendChild(el);
+  setTimeout(() => el.remove(), err ? 6000 : 3200);
+}
+
+const imgCache = new Map();
+export function imageOf(skin) {
+  const key = skin.id + ":" + skin.updated;
+  if (!imgCache.has(key)) imgCache.set(key, loadImage(skin.data));
+  return imgCache.get(key);
+}
+
+function seg(id, value, onChange) {
+  const root = $(id);
+  const sync = v => root.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === v)));
+  sync(value);
+  root.addEventListener("click", e => {
+    const b = e.target.closest("button[data-v]");
+    if (!b) return;
+    sync(b.dataset.v);
+    onChange(b.dataset.v);
+  });
+  return sync;
+}
+
+function saveUi() {
+  try { localStorage.setItem(UI_KEY, JSON.stringify({ view: state.view, filter: state.filter, sort: state.sort })); } catch (e) { /* ignore */ }
+}
+function loadUi() {
+  try { Object.assign(state, JSON.parse(localStorage.getItem(UI_KEY) || "{}")); } catch (e) { /* ignore */ }
+}
+
+function download(href, filename) {
+  const a = document.createElement("a");
+  a.href = href; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+}
+const safeName = s => (s || "skin").replace(/[^\p{L}\p{N}_\- ]+/gu, "").trim().replace(/\s+/g, "_") || "skin";
+
+// ---------- grid ----------
+function visibleSkins() {
+  const q = state.search.trim().toLowerCase();
+  let list = state.skins.filter(s =>
+    (state.filter === "all" || (state.filter === "fav" ? s.fav : s.model === state.filter)) &&
+    (!q || s.name.toLowerCase().includes(q)));
+  const by = {
+    new: (a, b) => b.created - a.created,
+    old: (a, b) => a.created - b.created,
+    name: (a, b) => a.name.localeCompare(b.name, getLang(), { numeric: true }),
+  }[state.sort];
+  return list.sort(by);
+}
+
+async function drawThumb(canvas, skin) {
+  const img = await imageOf(skin);
+  if (state.view === "tex") {
+    canvas.width = img.width; canvas.height = img.height;
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0);
+  } else {
+    renderFigure(canvas, img, skin.model, state.view, { legacy: skin.fmt === "64x32" });
+  }
+}
+
+function renderGrid() {
+  const grid = $("grid");
+  const list = visibleSkins();
+  const n = state.skins.length;
+  $("emptyState").hidden = n > 0;
+  $("toolbar").hidden = n === 0;
+  $("noMatch").hidden = !(n > 0 && list.length === 0);
+  $("countLabel").textContent = n === 0 ? "" : list.length === n ? (n === 1 ? t("countOne") : t("countMany", { n })) : t("countFiltered", { shown: list.length, n });
+  const cards = list.map(skin => {
+    const b = document.createElement("button");
+    b.className = "card";
+    b.id = "card-" + skin.id;
+    b.dataset.model = skin.model;
+    b.setAttribute("aria-label", t("open") + ": " + skin.name);
+    b.innerHTML = `<div class="stage${state.view === "tex" ? " tex" : ""}"><canvas></canvas></div>
+      <div class="card-name"></div>
+      <div class="card-meta"><span class="badge model">${skin.model === "slim" ? t("slim") : t("classic")}</span>${skin.fmt === "64x32" ? `<span class="badge">${t("badgeLegacy")}</span>` : ""}</div>
+      <div class="card-date">${t("added")} ${new Date(skin.created).toLocaleDateString(getLang())}</div>
+      ${skin.fav ? '<svg class="star" aria-hidden="true"><use href="#i-star"/></svg>' : ""}`;
+    b.querySelector(".card-name").textContent = skin.name;
+    drawThumb(b.querySelector("canvas"), skin);
+    b.addEventListener("click", () => openDetail(skin.id));
+    return b;
+  });
+  const album = document.documentElement.dataset.look === "album";
+  grid.classList.toggle("paged", album);
+  if (!album) { grid.replaceChildren(...cards); return; }
+  const pages = [];
+  for (let i = 0; i < cards.length; i += 9) {
+    const page = document.createElement("section");
+    page.className = "page";
+    const inner = document.createElement("div");
+    inner.className = "page-grid";
+    inner.append(...cards.slice(i, i + 9));
+    const no = document.createElement("div");
+    no.className = "page-no";
+    no.textContent = t("page", { n: i / 9 + 1 });
+    page.append(inner, no);
+    pages.push(page);
+  }
+  grid.replaceChildren(...pages);
+}
+
+// ---------- import ----------
+function readAsDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(file);
+  });
+}
+
+async function importFiles(files) {
+  const added = [];
+  const known = new Set(state.skins.map(s => s.data));
+  let order = Date.now();
+  for (const file of files) {
+    const name = file.name.replace(/\.png$/i, "");
+    let data, img;
+    try {
+      data = await readAsDataURL(file);
+      if (!data.startsWith("data:image/png")) throw new Error("type");
+      img = await loadImage(data);
+    } catch (e) { toast(t("notImage", { name: file.name }), true); continue; }
+    if (!(img.width === 64 && (img.height === 64 || img.height === 32))) { toast(t("badSize", { name: file.name, w: img.width, h: img.height }), true); continue; }
+    if (known.has(data)) { toast(t("skippedDup", { name: file.name })); continue; }
+    known.add(data);
+    const now = order++;
+    added.push({ id: newId(), name, data, model: detectModel(img), fmt: img.height === 32 ? "64x32" : "64x64", fav: false, notes: "", created: now, updated: now });
+  }
+  if (!added.length) return;
+  try { await db.putMany(added); } catch (e) { toast(t("storageError"), true); return; }
+  askPersist();
+  state.skins.push(...added);
+  renderGrid();
+  toast(t("imported", { n: added.length }));
+}
+
+function setupDrop() {
+  let depth = 0;
+  const hasFiles = e => e.dataTransfer && Array.from(e.dataTransfer.types || []).includes("Files");
+  window.addEventListener("dragenter", e => { if (!hasFiles(e) || editorOpen()) return; depth++; $("dropOverlay").hidden = false; });
+  window.addEventListener("dragleave", e => { if (!hasFiles(e)) return; depth = Math.max(0, depth - 1); if (!depth) $("dropOverlay").hidden = true; });
+  window.addEventListener("dragover", e => { if (hasFiles(e)) e.preventDefault(); });
+  window.addEventListener("drop", e => {
+    if (!hasFiles(e)) return;
+    e.preventDefault(); depth = 0; $("dropOverlay").hidden = true;
+    if (editorOpen()) return;
+    importFiles(Array.from(e.dataTransfer.files).filter(f => f.type === "image/png" || /\.png$/i.test(f.name)));
+  });
+  const pick = () => $("fileInput").click();
+  $("importBtn").addEventListener("click", pick);
+  $("emptyImportBtn").addEventListener("click", pick);
+  $("fileInput").addEventListener("change", e => { importFiles(Array.from(e.target.files)); e.target.value = ""; });
+}
+
+// ---------- backup ----------
+function exportBackup() {
+  const payload = { app: "minecraft-skin-library", version: 1, exported: new Date().toISOString(), skins: state.skins };
+  const url = URL.createObjectURL(new Blob([JSON.stringify(payload)], { type: "application/json" }));
+  download(url, `skin-library-backup-${new Date().toISOString().slice(0, 10)}.json`);
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  toast(t("backupSaved", { n: state.skins.length }));
+}
+
+async function importBackup(file) {
+  let payload;
+  try { payload = JSON.parse(await file.text()); } catch (e) { toast(t("backupBad"), true); return; }
+  if (!payload || payload.app !== "minecraft-skin-library" || !Array.isArray(payload.skins)) { toast(t("backupBad"), true); return; }
+  const ids = new Set(state.skins.map(s => s.id));
+  const datas = new Set(state.skins.map(s => s.data));
+  const fresh = [];
+  for (const s of payload.skins) {
+    if (!s || typeof s.data !== "string" || !s.data.startsWith("data:image/png;base64,")) continue;
+    if (ids.has(s.id) || datas.has(s.data)) continue;
+    fresh.push({
+      id: typeof s.id === "string" ? s.id : newId(), name: String(s.name || t("untitled")).slice(0, 60), data: s.data,
+      model: s.model === "slim" ? "slim" : "classic", fmt: s.fmt === "64x32" ? "64x32" : "64x64",
+      fav: !!s.fav, notes: String(s.notes || ""), created: Number(s.created) || Date.now(), updated: Number(s.updated) || Date.now(),
+    });
+  }
+  if (fresh.length) {
+    try { await db.putMany(fresh); } catch (e) { toast(t("storageError"), true); return; }
+    state.skins.push(...fresh);
+    renderGrid();
+  }
+  toast(t("backupLoaded", { n: fresh.length }));
+}
+
+// ---------- detail ----------
+let viewer = null, regionsOn = false;
+function initViewer() {
+  if (viewer || !window.skinview3d) return viewer;
+  try {
+    viewer = new skinview3d.SkinViewer({ width: 300, height: 400 });
+    $("dView3d").appendChild(viewer.canvas);
+    viewer.autoRotate = true; viewer.autoRotateSpeed = 0.8; viewer.zoom = 0.85;
+    new ResizeObserver(() => { const r = $("dView3d").getBoundingClientRect(); if (r.width) viewer.setSize(r.width, r.height); }).observe($("dView3d"));
+  } catch (e) { viewer = null; }
+  return viewer;
+}
+export function setOuterLayer(v, on) {
+  if (!v) return;
+  const sk = v.playerObject.skin;
+  ["head", "body", "rightArm", "leftArm", "rightLeg", "leftLeg"].forEach(p => { if (sk[p] && sk[p].outerLayer) sk[p].outerLayer.visible = on; });
+}
+
+export function drawTexture(canvas, img, labels) {
+  const S = 10;
+  canvas.width = img.width * S; canvas.height = img.height * S;
+  const ctx = canvas.getContext("2d");
+  ctx.imageSmoothingEnabled = false;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  if (labels) drawRegions(ctx, S, img.height);
+}
+export function drawRegions(ctx, S, h = 64) {
+  const cs = getComputedStyle(document.documentElement);
+  const acc = cs.getPropertyValue("--accent").trim();
+  const fg = cs.getPropertyValue("--accent-fg").trim();
+  const names = t("regionNames");
+  ctx.font = `600 ${Math.round(S * 2.1)}px Figtree, sans-serif`;
+  ctx.lineWidth = Math.max(2, S * 0.3);
+  for (const [x, y, w, rh, key] of REGIONS) {
+    if (y + rh > h) continue;
+    ctx.strokeStyle = acc;
+    ctx.strokeRect(x * S + ctx.lineWidth / 2, y * S + ctx.lineWidth / 2, w * S - ctx.lineWidth, rh * S - ctx.lineWidth);
+    const label = names[key];
+    const tw = ctx.measureText(label).width;
+    ctx.fillStyle = acc; ctx.fillRect(x * S + 3, y * S + 3, tw + S * 1.2, S * 2.8);
+    ctx.fillStyle = fg; ctx.fillText(label, x * S + 3 + S * 0.6, y * S + 3 + S * 2.1);
+  }
+}
+
+const byId = id => state.skins.find(s => s.id === id);
+
+async function updateSkin(skin, patch) {
+  Object.assign(skin, patch);
+  try { await db.put(skin); } catch (e) { toast(t("storageError"), true); }
+}
+
+async function openDetail(id) {
+  const skin = byId(id);
+  if (!skin) return;
+  state.current = id;
+  const d = $("detail");
+  $("dName").value = skin.name;
+  syncFav(skin);
+  $("dModel").textContent = skin.model === "slim" ? t("modelSlim") : t("modelClassic");
+  $("dFmt").hidden = skin.fmt !== "64x32"; $("dFmt").textContent = t("badgeLegacy");
+  $("dLegacy").hidden = skin.fmt !== "64x32";
+  $("dNotes").value = skin.notes || "";
+  $("dHow").innerHTML = t("mcHow", { model: skin.model === "slim" ? t("modelSlim") : t("modelClassic") });
+  $("dAdded").textContent = t("added") + ": " + new Date(skin.created).toLocaleDateString(getLang());
+  disarmDelete();
+  if (!d.open) d.showModal();
+  const v = initViewer();
+  $("dFallback").hidden = !!v;
+  const img = await imageOf(skin);
+  if (state.current !== id) return;
+  if (v) {
+    try { await v.loadSkin(skin.data, { model: skin.model === "slim" ? "slim" : "default" }); } catch (e) { /* ignore */ }
+    setOuterLayer(v, $("dOuter").getAttribute("aria-pressed") === "true");
+  }
+  const legacy = skin.fmt === "64x32";
+  renderFigure($("dFront"), img, skin.model, "front", { legacy });
+  renderFigure($("dBack"), img, skin.model, "back", { legacy });
+  drawTexture($("dTex"), img, regionsOn);
+}
+
+function syncFav(skin) {
+  const b = $("dFav");
+  b.setAttribute("aria-pressed", String(!!skin.fav));
+  b.querySelector("use").setAttribute("href", skin.fav ? "#i-star" : "#i-star-o");
+  b.title = skin.fav ? t("unfav") : t("fav");
+  b.setAttribute("aria-label", b.title);
+}
+
+function step(dir) {
+  const list = visibleSkins();
+  if (!list.length) return;
+  const i = list.findIndex(s => s.id === state.current);
+  const next = list[(i + dir + list.length) % list.length];
+  openDetail(next.id);
+}
+
+let deleteArmed = false, deleteTimer = 0;
+function disarmDelete() {
+  deleteArmed = false; clearTimeout(deleteTimer);
+  $("dDelete").classList.remove("armed"); $("dDelete").textContent = t("delete");
+}
+
+function setupDetail() {
+  const d = $("detail");
+  $("dClose").addEventListener("click", () => d.close());
+  d.addEventListener("click", e => { if (e.target === d) d.close(); });
+  d.addEventListener("close", () => { state.current = null; renderGrid(); });
+  d.addEventListener("keydown", e => {
+    if (e.target.matches("input, textarea")) return;
+    if (e.key === "ArrowRight") step(1);
+    if (e.key === "ArrowLeft") step(-1);
+  });
+  $("dPrev").addEventListener("click", () => step(-1));
+  $("dNext").addEventListener("click", () => step(1));
+  $("dName").addEventListener("change", e => {
+    const skin = byId(state.current); if (!skin) return;
+    const name = e.target.value.trim() || t("untitled");
+    e.target.value = name; updateSkin(skin, { name });
+  });
+  $("dNotes").addEventListener("change", e => { const skin = byId(state.current); if (skin) updateSkin(skin, { notes: e.target.value }); });
+  $("dFav").addEventListener("click", () => { const skin = byId(state.current); if (!skin) return; updateSkin(skin, { fav: !skin.fav }); syncFav(skin); });
+  const toggle = (id, fn) => $(id).addEventListener("click", e => {
+    const b = e.currentTarget, on = b.getAttribute("aria-pressed") !== "true";
+    b.setAttribute("aria-pressed", String(on)); fn(on);
+  });
+  toggle("dRot", on => { if (viewer) viewer.autoRotate = on; });
+  toggle("dWalk", on => { if (viewer) viewer.animation = on ? Object.assign(new skinview3d.WalkingAnimation(), { speed: 0.6 }) : null; });
+  toggle("dOuter", on => setOuterLayer(viewer, on));
+  toggle("dRegions", async on => { regionsOn = on; const s = byId(state.current); if (s) drawTexture($("dTex"), await imageOf(s), on); });
+  $("dExport").addEventListener("click", () => { const s = byId(state.current); if (s) download(s.data, safeName(s.name) + ".png"); });
+  $("dDup").addEventListener("click", async () => {
+    const s = byId(state.current); if (!s) return;
+    const now = Date.now();
+    const copy = { ...s, id: newId(), name: (s.name + " " + t("copySuffix")).slice(0, 60), fav: false, created: now, updated: now };
+    try { await db.put(copy); } catch (e) { toast(t("storageError"), true); return; }
+    state.skins.push(copy); toast(t("duplicated")); openDetail(copy.id);
+  });
+  $("dDelete").addEventListener("click", async () => {
+    if (!deleteArmed) {
+      deleteArmed = true; $("dDelete").classList.add("armed"); $("dDelete").textContent = t("deleteConfirm");
+      deleteTimer = setTimeout(disarmDelete, 3500); return;
+    }
+    const id = state.current; disarmDelete();
+    try { await db.remove(id); } catch (e) { toast(t("storageError"), true); return; }
+    state.skins = state.skins.filter(s => s.id !== id);
+    d.close(); toast(t("deleted"));
+  });
+  $("dEdit").addEventListener("click", () => {
+    const s = byId(state.current); if (!s) return;
+    d.close();
+    startEditor(s);
+  });
+}
+
+// ---------- editor bridge ----------
+function startEditor(skin) {
+  openEditor(skin, async result => {
+    // result: { data, model, name, asCopy }
+    const now = Date.now();
+    let target;
+    if (skin && !result.asCopy) {
+      target = skin;
+      Object.assign(target, { data: result.data, model: result.model, name: result.name, fmt: "64x64", updated: now });
+    } else {
+      target = { id: newId(), name: result.name, data: result.data, model: result.model, fmt: "64x64", fav: false, notes: skin && result.asCopy ? skin.notes : "", created: now, updated: now };
+      state.skins.push(target);
+    }
+    try { await db.put(target); } catch (e) { toast(t("storageError"), true); return null; }
+    askPersist();
+    renderGrid();
+    toast(t("saved"));
+    setTimeout(() => openDetail(target.id), 50);
+    return target;
+  });
+}
+
+// ---------- settings ----------
+function applyTheme(v) {
+  if (v === "light" || v === "dark") document.documentElement.dataset.theme = v;
+  else delete document.documentElement.dataset.theme;
+  try { localStorage.setItem("skin-library-theme", v); } catch (e) { /* ignore */ }
+  if ($("detail").open && state.current) openDetail(state.current);
+}
+
+function drawEmptyFigure() {
+  // a tiny original mannequin for the empty state
+  import("./skin.js").then(({ blankTemplate }) => renderFigure($("emptyFigure"), blankTemplate("classic"), "classic", "front"));
+}
+
+// ---------- boot ----------
+function syncLooks() {
+  const cur = document.documentElement.dataset.look;
+  document.querySelectorAll(".look-opt").forEach(b => b.setAttribute("aria-checked", String(b.dataset.look === cur)));
+}
+
+async function boot() {
+  applyLook(savedLook());
+  loadUi();
+  applyI18n();
+  seg("viewSeg", state.view, v => { state.view = v; saveUi(); renderGrid(); });
+  seg("filterSeg", state.filter, v => { state.filter = v; saveUi(); renderGrid(); });
+  $("sortSelect").value = state.sort;
+  $("sortSelect").addEventListener("change", e => { state.sort = e.target.value; saveUi(); renderGrid(); });
+  $("searchInput").addEventListener("input", e => { state.search = e.target.value; renderGrid(); });
+  seg("langSeg", getLang(), v => { setLang(v); renderGrid(); if ($("detail").open && state.current) openDetail(state.current); });
+  let theme = "system";
+  try { theme = localStorage.getItem("skin-library-theme") || "system"; } catch (e) { /* ignore */ }
+  seg("themeSeg", theme, applyTheme);
+  $("newBtn").addEventListener("click", () => startEditor(null));
+  $("emptyNewBtn").addEventListener("click", () => startEditor(null));
+  $("settingsBtn").addEventListener("click", () => { syncLooks(); $("settings").showModal(); });
+  $("sClose").addEventListener("click", () => $("settings").close());
+  $("settings").addEventListener("click", e => { if (e.target === $("settings")) $("settings").close(); });
+  $("lookList").addEventListener("click", e => {
+    const b = e.target.closest(".look-opt"); if (!b) return;
+    applyLook(b.dataset.look); syncLooks(); renderGrid();
+  });
+  $("backupExportBtn").addEventListener("click", exportBackup);
+  $("backupImportBtn").addEventListener("click", () => $("backupInput").click());
+  $("backupInput").addEventListener("change", e => { const f = e.target.files[0]; if (f) importBackup(f); e.target.value = ""; });
+  setupDrop();
+  setupDetail();
+  drawEmptyFigure();
+  try { state.skins = await db.all(); } catch (e) { state.skins = []; toast(t("storageError"), true); }
+  renderGrid();
+}
+
+boot();
