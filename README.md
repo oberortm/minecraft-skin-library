@@ -68,12 +68,13 @@ Dann http://localhost:8000 öffnen.
 
 ## Neue Version veröffentlichen (Cache-Busting)
 
-GitHub Pages lässt Browser Dateien bis zu 10 Minuten cachen. Damit nie altes und neues JavaScript gemischt wird, hängt an jeder CSS- und JS-URL eine Versionsnummer (derzeit `?v=7`). Alles steht in **einer** Datei, `index.html`: Stylesheets, Skripte und die Import-Map, die jedem Modul genau eine versionierte URL gibt (so entstehen keine doppelten Modul-Instanzen).
+GitHub Pages lässt Browser Dateien bis zu 10 Minuten cachen. Damit nie altes und neues JavaScript gemischt wird, hängt an jeder CSS- und JS-URL eine Versionsnummer (`?v=N`, die aktuelle steht in `<meta name="app-version">`). Alles steht in **einer** Datei, `index.html`: Stylesheets, Skripte und die Import-Map, die jedem Modul genau eine versionierte URL gibt (so entstehen keine doppelten Modul-Instanzen).
 
-**Bei jedem Release die Nummer erhöhen**, z. B. von 7 auf 8:
+**Bei jedem Release die Nummer erhöhen:**
 
 ```bash
-sed -i 's/?v=7"/?v=8"/g; s/name="app-version" content="7"/name="app-version" content="8"/' index.html
+ALT=$(grep -o 'app-version" content="[0-9]*' index.html | grep -o '[0-9]*$'); NEU=$((ALT+1))
+sed -i "s/?v=$ALT\"/?v=$NEU\"/g; s/app-version\" content=\"$ALT\"/app-version\" content=\"$NEU\"/" index.html
 ```
 
 Neue Module in `js/` müssen zusätzlich in der Import-Map in `index.html` eingetragen werden. Die Bibliotheken in `vendor/` tragen ihre Version im Ordnernamen; skinview3d und der eigene Code holen sich `three` über dieselbe Import-Map-Zeile, damit nie zwei three.js-Kopien geladen werden. Startet ein Teil der App nicht (fehlendes Element, Fehler), laufen die anderen Knöpfe weiter und es erscheint ein Hinweis statt einer toten Seite.

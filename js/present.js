@@ -25,6 +25,8 @@ const st = {
   on: false, list: [], i: 0, viewer: null, sv: null, base: null, scene: "studio", anim: "idle", rotate: true,
   group: "classic", scenes: { classic: "studio", minecraft: "mc-sunrise" }, world: null, worldMod: null, token: 0,
   fx: { raf: 0, parts: [], mode: null }, idleTimer: 0, hdrTimer: 0, busy: false, onExit: null,
+  // "reduce motion" in the system: start still, but a click on a motion button always wins
+  motion: true,
 };
 
 function prefs() {
@@ -130,14 +132,16 @@ function toggleGroup() {
   applyScene(st.scenes[next]);
 }
 
-function applyAnim(id) {
+function applyAnim(id, byUser = false) {
   st.anim = id;
-  document.querySelectorAll("#prAnims button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.anim === id)));
+  if (byUser) st.motion = true;
+  // buttons only look pressed when they really do something
+  document.querySelectorAll("#prAnims button").forEach(b => b.setAttribute("aria-pressed", String(st.motion && b.dataset.anim === id)));
   const v = st.viewer;
   if (!v) return;
   const A = st.sv;
   const make = { idle: () => new A.IdleAnimation(), walk: () => new A.WalkingAnimation(), run: () => new A.RunningAnimation(), fly: () => new A.FlyingAnimation() }[id];
-  v.animation = reduce() ? null : make();
+  v.animation = st.motion ? make() : null;
   if (v.animation && id === "walk") v.animation.speed = 0.75;
   savePrefs();
 }
@@ -148,7 +152,7 @@ function applyRotate(on) {
   const v = st.viewer;
   if (v) {
     // in a block world the camera circles the figure so the world stays put; otherwise the figure turns
-    const spin = on && !reduce();
+    const spin = on;
     v.autoRotate = !st.world && spin; v.autoRotateSpeed = 1.1;
     v.controls.autoRotate = !!st.world && spin; v.controls.autoRotateSpeed = 1.6;
   }
@@ -256,6 +260,8 @@ export const presentDebug = () => st;
 export async function startPresentation(list, startIndex = 0, onExit) {
   if (!list.length) return;
   prefs();
+  st.motion = !reduce();
+  if (!st.motion) st.rotate = false; // start still; the rotate button turns it on
   st.list = list; st.on = true; st.onExit = onExit;
   document.body.classList.add("presenting");
   $("present").hidden = false;
@@ -299,7 +305,7 @@ export function setupPresentation() {
     const b = document.createElement("button");
     b.className = "pr-pill"; b.dataset.anim = a; b.id = "anim-" + a;
     b.innerHTML = `<span data-i18n="anim_${a}"></span>`;
-    b.addEventListener("click", () => applyAnim(a));
+    b.addEventListener("click", () => applyAnim(a, true));
     return b;
   }));
   applyI18n($("present"));
