@@ -321,6 +321,8 @@ export function setupPresentation() {
   const root = $("present");
   addEventListener("resize", () => { if (st.on && st.fx.size) st.fx.size(); });
   root.addEventListener("pointermove", wake);
+  // touch screens send no hover moves: any tap brings the controls back
+  root.addEventListener("pointerdown", wake, true);
   document.addEventListener("pointermove", e => { if (st.on && e.clientY < 10) openHeader(); });
   document.querySelector(".top").addEventListener("pointerenter", () => { if (st.on) clearTimeout(st.hdrTimer); });
   document.querySelector(".top").addEventListener("pointerleave", () => { if (st.on && document.body.classList.contains("hdr-open")) openHeader(); });
