@@ -58,29 +58,40 @@ function paint(seed, fn) {
 const shade = (rgb, f) => rgb.map(v => v * f);
 const hex = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
 
+/** Pick one of a few fixed shades from clustered noise: the calm, blotchy look of classic block art. */
+const pal = colors => colors.map(hex);
+function pick(p, v) { return p[Math.max(0, Math.min(p.length - 1, Math.floor(v * p.length)))]; }
+const GRASS = pal(["#4c7a2e", "#5a8b37", "#659a3f", "#71a848", "#7db552"]);
+const DIRT = pal(["#5c3f2a", "#6b4a32", "#7a573b", "#886246", "#966f51"]);
+const STONE = pal(["#6c6c6e", "#7a7a7c", "#858587", "#909092", "#9c9c9e"]);
+const BARK = pal(["#3e2f1d", "#4c3a24", "#5a462c", "#685234"]);
+const WOOD = pal(["#9c7b4b", "#ae8c57", "#bd9a62", "#c9a76d"]);
+const LEAF = pal(["#22481a", "#2c5a20", "#376a27", "#43792f", "#4f8738"]);
+const SAND = pal(["#cfc38c", "#d8cd97", "#e0d6a3", "#e8dfb0"]);
+const WATER = pal(["#2a5596", "#2f5fa5", "#3568b2", "#3b72bd"]);
+
 const TEX = {
-  grassTop: s => paint(s, (x, y, r, n) => shade(hex("#5f9d3d"), 0.82 + r() * 0.3 + (n(x / 3, y / 3) - 0.5) * 0.18)),
+  grassTop: s => paint(s, (x, y, r, n) => pick(GRASS, n(x / 2.2, y / 2.2) * 0.65 + r() * 0.35)),
   grassSide: s => paint(s, (x, y, r, n) => {
-    const edge = 3 + Math.floor(n(x * 0.9, 1) * 3);
-    if (y < edge) return shade(hex("#5f9d3d"), 0.8 + r() * 0.28);
-    return shade(hex("#86603f"), 0.78 + r() * 0.3 + (n(x / 2, y / 2) - 0.5) * 0.2);
+    // grass hangs over the top edge in short irregular drips
+    const drip = 2 + Math.floor(n(x * 1.3, 0.5) * 2.6) + (r() < 0.18 ? 1 : 0);
+    if (y < drip) return pick(GRASS, n(x / 2, y / 2) * 0.6 + r() * 0.4);
+    return pick(DIRT, n(x / 2.4, y / 2.4) * 0.6 + r() * 0.4);
   }),
-  dirt: s => paint(s, (x, y, r, n) => shade(hex("#86603f"), 0.76 + r() * 0.32 + (n(x / 2, y / 2) - 0.5) * 0.22)),
-  stone: s => paint(s, (x, y, r, n) => shade(hex("#8b8d90"), 0.8 + r() * 0.14 + (n(x / 4, y / 3) - 0.5) * 0.35)),
-  sand: s => paint(s, (x, y, r) => shade(hex("#dccf98"), 0.9 + r() * 0.14)),
-  logSide: s => paint(s, (x, y, r, n) => {
-    const groove = n(x * 1.7, y / 6) > 0.62 ? 0.72 : 1;
-    return shade(hex("#6e5233"), (0.82 + r() * 0.2) * groove);
-  }),
+  dirt: s => paint(s, (x, y, r, n) => pick(DIRT, n(x / 2.4, y / 2.4) * 0.6 + r() * 0.4)),
+  stone: s => paint(s, (x, y, r, n) => pick(STONE, n(x / 3.5, y / 2.5) * 0.75 + r() * 0.25)),
+  sand: s => paint(s, (x, y, r, n) => pick(SAND, n(x / 2, y / 2) * 0.5 + r() * 0.5)),
+  logSide: s => paint(s, (x, y, r, n) => pick(BARK, n(x * 0.9, y / 7) * 0.7 + r() * 0.3)),
   logTop: s => paint(s, (x, y, r) => {
     const d = Math.max(Math.abs(x - 7.5), Math.abs(y - 7.5));
-    if (d > 6.5) return shade(hex("#6e5233"), 0.8 + r() * 0.2);
-    return shade(hex("#b8925e"), (Math.floor(d) % 2 ? 0.86 : 1) * (0.92 + r() * 0.1));
+    if (d > 6.5) return pick(BARK, r());
+    return pick(WOOD, (Math.floor(d) % 2 ? 0.25 : 0.7) + r() * 0.3);
   }),
   leaves: s => paint(s, (x, y, r, n) => {
-    if (r() < 0.2) return [0, 0, 0, 0];
-    return shade(hex("#3f7f2c"), 0.65 + r() * 0.35 + (n(x / 2, y / 2) - 0.5) * 0.3);
+    if (r() < 0.09) return [0, 0, 0, 0];
+    return pick(LEAF, n(x / 1.8, y / 1.8) * 0.6 + r() * 0.4);
   }),
+  water: s => paint(s, (x, y, r, n) => pick(WATER, n(x / 3, y / 1.5) * 0.7 + r() * 0.3)),
   quartz: s => paint(s, (x, y, r) => {
     let f = 0.96 + r() * 0.04;
     if (x === 0 || y === 0) f *= 1.04;
@@ -506,7 +517,7 @@ export class McWorld {
     for (const [x, z] of [[5, 4], [-6, 3], [4, -6]]) cells.push(["stone", x, (tops.get(x + "," + z) ?? 0) + 1, z]);
     const g = this.buildBlocks(dedupe(cells), 21);
     // water: one big plane, fades into the fog
-    const wt = new THREE.CanvasTexture(paint(9, (x, y, rr) => shade(hex("#3d6fb4"), 0.85 + rr() * 0.22)));
+    const wt = new THREE.CanvasTexture(TEX.water(9));
     wt.wrapS = wt.wrapT = THREE.RepeatWrapping; wt.repeat.set(140, 140); wt.magFilter = THREE.NearestFilter; wt.colorSpace = THREE.SRGBColorSpace;
     const water = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000),
       new THREE.MeshStandardMaterial({ map: wt, roughness: 0.12, metalness: 0.1, transparent: true, opacity: 0.88 }));
