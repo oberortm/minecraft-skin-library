@@ -541,6 +541,8 @@ export class McWorld {
     this.restoreControls = () => { ctl.update = update; };
     ctl.update = () => {
       const cam = v.camera, tgt = ctl.target;
+      // a cinematic moves the camera itself
+      if (this.freeCamera) { const out = update(); this.wantDist = cam.position.distanceTo(tgt); return out; }
       if (this.wantDist) cam.position.sub(tgt).setLength(this.wantDist).add(tgt);
       const out = update();
       this.wantDist = cam.position.distanceTo(tgt);
@@ -1068,6 +1070,86 @@ export class McWorld {
       this.rays.visible = true;
     } else if (this.rays) this.rays.visible = false;
     r.shadowMap.needsUpdate = true;
+    this.syncWeather();
+  }
+
+  // ---------- weather: rain, snow, fireflies, falling leaves (only outdoors) ----------
+  /** type: "clear" | "rain" | "snow" | "fireflies" | "leaves" */
+  setWeather(type) {
+    this.weatherType = type;
+    this.syncWeather();
+  }
+  syncWeather() {
+    const type = this.weatherType || "clear";
+    const outdoors = LOOKS[this.lookId] && LOOKS[this.lookId].set === "land";
+    if (this.weather && this.weather.type !== type) {
+      this.root.remove(this.weather.obj);
+      this.weather.obj.geometry.dispose(); this.weather.obj.material.dispose();
+      this.weather = null;
+    }
+    if (type === "clear") return;
+    if (!this.weather) this.weather = this.buildWeather(type);
+    this.weather.obj.visible = !!outdoors;
+  }
+  buildWeather(type) {
+    const R = 46, top = FEET + 60, bottom = FEET - 2, r = rng(type.length * 977);
+    const count = { rain: 2400, snow: 1600, fireflies: 110, leaves: 220 }[type];
+    const parts = [];
+    for (let i = 0; i < count; i++) {
+      const a = r() * Math.PI * 2, d = Math.sqrt(r()) * R;
+      parts.push({ x: Math.cos(a) * d, z: Math.sin(a) * d, y: bottom + r() * (top - bottom), p: r() * 100, s: 0.7 + r() * 0.6 });
+    }
+    let obj;
+    if (type === "rain") {
+      // thin streaks: a line per drop, a little slanted by the wind
+      const pos = new Float32Array(count * 6);
+      const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+      obj = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: "#aebfdc", transparent: true, opacity: 0.5, depthWrite: false }));
+    } else {
+      const pos = new Float32Array(count * 3), col = new Float32Array(count * 3);
+      const g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.setAttribute("color", new THREE.BufferAttribute(col, 3));
+      const leafCols = ["#4f8738", "#6b9a3a", "#a8842d", "#c0602a"].map(c => new THREE.Color(c));
+      parts.forEach((q, i) => {
+        const c = type === "snow" ? new THREE.Color("#ffffff") : type === "fireflies" ? new THREE.Color("#d8ff6a") : leafCols[i % 4];
+        col.set([c.r, c.g, c.b], i * 3);
+        if (type === "fireflies") { q.y = FEET + 2 + r() * 14; q.x *= 0.6; q.z *= 0.6; }
+      });
+      obj = new THREE.Points(g, new THREE.PointsMaterial({
+        size: { snow: 0.9, fireflies: 1.5, leaves: 0.9 }[type], vertexColors: true, transparent: true, depthWrite: false,
+        map: type === "leaves" ? null : this.glowTex(), opacity: type === "snow" ? 0.95 : 1,
+        blending: type === "fireflies" ? THREE.AdditiveBlending : THREE.NormalBlending, fog: type !== "fireflies",
+      }));
+    }
+    obj.frustumCulled = false;
+    obj.renderOrder = 2;
+    this.root.add(obj);
+    const w = { type, obj, parts, top, bottom, R };
+    this.updateWeather(w, 0, 0);
+    return w;
+  }
+  updateWeather(w, t, dt) {
+    const a = w.obj.geometry.attributes.position, still = reduce();
+    const fall = { rain: 95, snow: 7, fireflies: 0, leaves: 5 }[w.type] * (still ? 0 : 1);
+    w.parts.forEach((q, i) => {
+      if (w.type === "fireflies") {
+        const x = q.x + Math.sin(t * 0.4 * q.s + q.p) * 3, y = q.y + Math.sin(t * 0.7 * q.s + q.p * 2) * 1.5, z = q.z + Math.cos(t * 0.33 * q.s + q.p) * 3;
+        a.setXYZ(i, x, y, z);
+        // blink: brightness through the colour
+        const c = w.obj.geometry.attributes.color, glow = still ? 0.8 : Math.max(0, Math.sin(t * 1.7 * q.s + q.p)) ** 2;
+        c.setXYZ(i, 0.85 * glow, 1 * glow, 0.42 * glow);
+        return;
+      }
+      q.y -= fall * q.s * dt;
+      if (q.y < w.bottom) q.y += w.top - w.bottom;
+      const sway = w.type === "snow" ? Math.sin(t * 0.8 + q.p) * 1.2 : w.type === "leaves" ? Math.sin(t * 1.4 + q.p) * 2.2 : 0;
+      if (w.type === "rain") {
+        a.setXYZ(i * 2, q.x, q.y, q.z);
+        a.setXYZ(i * 2 + 1, q.x + 0.25, q.y + 2.6, q.z + 0.1);
+      } else a.setXYZ(i, q.x + sway, q.y, q.z + sway * 0.4);
+    });
+    a.needsUpdate = true;
+    if (w.type === "fireflies") w.obj.geometry.attributes.color.needsUpdate = true;
   }
 
   /** Per-frame motion (dust, stars, rays) and the automatic quality fallback. */
@@ -1087,6 +1169,7 @@ export class McWorld {
       const look = LOOKS[this.lookId];
       u.strength.value = p.z > 1 ? 0 : (look.rays ? look.rays.strength : 0) * (1 - Math.min(1, Math.max(0, (away - 0.9) / 0.9)));
     }
+    if (this.weather && this.weather.obj.visible) this.updateWeather(this.weather, t, dt);
     if (!reduce()) {
       this.sky.material.uniforms.time.value = t;
       if (this.waterFancy) this.waterFancy.uniforms.time.value = t;
@@ -1129,6 +1212,7 @@ export class McWorld {
   /** Take the world out of the scene, restore the viewer as skinview3d set it up, free GPU memory. */
   dispose() {
     const v = this.viewer, r = v.renderer, s = this.saved;
+    if (this.weather) { this.weather.obj.geometry.dispose(); this.weather.obj.material.dispose(); this.weather = null; }
     v.scene.onBeforeRender = () => {};
     if (this.restoreControls) this.restoreControls();
     v.scene.remove(this.root);

@@ -4,6 +4,7 @@ import { t, applyI18n } from "./i18n.js";
 import { $ } from "./dom.js";
 import { load3d, pixelRatio } from "./view3d.js";
 import { loadEquipment, saveEquipment, applyElytra, applyArmor, ARMOR_SLOTS, ARMOR_MATS, TRIM_PATTERNS, TRIM_MATS, applyItems, ITEMS, TOOL_MATS } from "./equipment.js";
+import { EMOTES, emoteAnimations } from "./emotes.js";
 import { readPack, packCanvases, savePack, loadPack, clearPack, SOURCES, downloadSource, selectedSource, selectSource, packStale, downloadable } from "./pack.js";
 const KEY = "skin-library-present";
 const QUALITY_KEY = "skin-library-mc-quality";
@@ -43,7 +44,7 @@ function prefs() {
   } else if (SCENES.classic.some(s => s.id === saved.scene)) st.scenes.classic = saved.scene; // older versions kept a single scene
   st.group = GROUPS.includes(saved.group) ? saved.group : "classic";
   st.scene = st.scenes[st.group];
-  if (ANIMS.includes(saved.anim)) st.anim = saved.anim;
+  if (ANIMS.includes(saved.anim) || EMOTES.includes(saved.anim)) st.anim = saved.anim;
   if (typeof saved.rotate === "boolean") st.rotate = saved.rotate;
 }
 function savePrefs() {
@@ -66,8 +67,9 @@ async function initViewer() {
       const r = $("prStage").getBoundingClientRect();
       if (!r.width) return;
       v.setSize(r.width, r.height);
-      // keep the whole figure in view on tall, narrow screens
-      v.zoom = Math.min(0.66, 0.66 * (r.width / r.height) / 0.95);
+      // keep the whole figure (and a group) in view on tall, narrow screens
+      if (st.world) v.zoom = Math.min(0.66, 0.66 * (r.width / r.height) / 0.95);
+      else fitGroupCamera();
     }).observe($("prStage"));
     st.viewer = v;
     bindSkinDrag(v, kit.THREE);
@@ -108,6 +110,7 @@ async function applyScene(id) {
       v.cameraLight.color.set(sc.cam[0]); v.cameraLight.intensity = st.base.cam * sc.cam[1];
     }
     startFx(sc.fx);
+    syncGroupLook();
     applyRotate(st.rotate);
     return;
   }
@@ -122,7 +125,11 @@ async function applyScene(id) {
       st.world = new st.worldMod.McWorld(v, q || st.worldMod.guessQuality(), !!q);
       applySavedPack();
     }
+    unfitCamera();
     st.world.setLook(id);
+    st.world.setWeather(savedWeather());
+    st.camBase = null; st.camFactor = 1;
+    syncGroupLook();
     applyRotate(st.rotate);
   } catch (e) {
     console.error("[skin-library] block world failed:", e);
@@ -254,7 +261,7 @@ function setElytra(on) {
   applyEquipment();
 }
 function toggleEquipPanel(open = $("prEquipPanel").hidden) {
-  if (open) togglePanel(false);
+  if (open) { togglePanel(false); closeExtraPanels(); }
   $("prEquipPanel").hidden = !open;
   $("prEquip").setAttribute("aria-expanded", String(open));
   if (open) syncEquipUi();
@@ -357,10 +364,11 @@ async function choosePack(file) {
   }
 }
 function togglePanel(open = $("prWorldPanel").hidden) {
-  if (open) toggleEquipPanel(false);
+  if (open) { toggleEquipPanel(false); closeExtraPanels(); }
   $("prWorldPanel").hidden = !open;
   $("prWorld").setAttribute("aria-expanded", String(open));
   if (open) {
+    $("prWeather").value = savedWeather();
     const seq = st.packSeq = (st.packSeq || 0) + 1;
     selectedSource().then(id => { if (seq === st.packSeq) syncPackUi(id); });  // ignore if the user chose meanwhile
     syncQualityUi();
@@ -397,14 +405,271 @@ function applyAnim(id, byUser = false) {
   st.anim = id;
   if (byUser) st.motion = true;
   // buttons only look pressed when they really do something
-  document.querySelectorAll("#prAnims button").forEach(b => b.setAttribute("aria-pressed", String(st.motion && b.dataset.anim === id)));
+  document.querySelectorAll("#prAnims button[data-anim]").forEach(b => b.setAttribute("aria-pressed", String(st.motion && b.dataset.anim === id)));
+  syncEmoteBtn();
   const v = st.viewer;
   if (!v) return;
-  const A = st.sv;
-  const make = { idle: () => new A.IdleAnimation(), walk: () => new A.WalkingAnimation(), run: () => new A.RunningAnimation(), fly: () => new A.FlyingAnimation() }[id];
-  v.animation = st.motion ? make() : null;
-  if (v.animation && id === "walk") v.animation.speed = 0.75;
+  v.animation = null;
+  resetPose(v.playerObject);
+  v.animation = st.motion ? makeAnim(id) : null;
+  for (const g of st.groupFigs || []) { resetPose(g.po); g.anim = st.motion ? makeAnim(id, g.phase) : null; }
   savePrefs();
+}
+
+/** A fresh animation of this kind; phase shifts it so group figures do not move in lockstep. */
+function makeAnim(id, phase = 0) {
+  const A = st.sv;
+  const E = st.emoteClasses || (st.emoteClasses = emoteAnimations(A));
+  const a = E[id] ? new E[id]() : new ({ idle: A.IdleAnimation, walk: A.WalkingAnimation, run: A.RunningAnimation, fly: A.FlyingAnimation }[id] || A.IdleAnimation)();
+  if (id === "walk") a.speed = 0.75;
+  a.progress = phase;
+  return a;
+}
+/** Back to the plain standing pose: emotes also move and turn whole body parts. */
+function resetPose(po) {
+  po.resetJoints();
+  po.position.set(0, 0, 0); po.rotation.set(0, 0, 0);
+  const sk = po.skin;
+  if (!sk.userData.rest) sk.userData.rest = ["head", "body", "rightArm", "leftArm", "rightLeg", "leftLeg"].map(k => [k, sk[k].position.clone()]);
+  for (const [k, pos] of sk.userData.rest) { sk[k].position.copy(pos); sk[k].rotation.set(0, 0, 0); }
+}
+function syncEmoteBtn() {
+  const b = $("prEmoteBtn");
+  if (!b) return;
+  const on = st.motion && EMOTES.includes(st.anim);
+  b.setAttribute("aria-pressed", String(on));
+  b.querySelector("span").textContent = on ? t("emote_" + st.anim) : t("emotes");
+  document.querySelectorAll("#prEmotes button").forEach(x => x.setAttribute("aria-pressed", String(on && x.dataset.anim === st.anim)));
+}
+function toggleEmotes(open = $("prEmotes").hidden) {
+  if (open) { togglePanel(false); toggleEquipPanel(false); closeExtraPanels(); }
+  $("prEmotes").hidden = !open;
+  $("prEmoteBtn").setAttribute("aria-expanded", String(open));
+}
+function closeExtraPanels() {
+  for (const [panel, btn] of [["prPhotoPanel", "prPhoto"], ["prGroupPanel", "prGroupBtn"], ["prEmotes", "prEmoteBtn"]]) {
+    if ($(panel)) $(panel).hidden = true;
+    if ($(btn)) $(btn).setAttribute("aria-expanded", "false");
+  }
+}
+function toggleExtra(panel, btn, open = $(panel).hidden) {
+  togglePanel(false); toggleEquipPanel(false); closeExtraPanels();
+  $(panel).hidden = !open;
+  $(btn).setAttribute("aria-expanded", String(open));
+  if (open && panel === "prGroupPanel") renderGroupList();
+  if (open && panel === "prPhotoPanel") syncPhotoUi();
+}
+
+// ---------- weather (block worlds outdoors) ----------
+const WEATHER_KEY = "skin-library-mc-weather";
+const savedWeather = () => { try { const w = localStorage.getItem(WEATHER_KEY); return ["clear", "rain", "snow", "fireflies", "leaves"].includes(w) ? w : "clear"; } catch (e) { return "clear"; } };
+function setWeather(w) {
+  try { localStorage.setItem(WEATHER_KEY, w); } catch (e) { /* ignore */ }
+  if (st.world) st.world.setWeather(w);
+}
+
+// ---------- photo ----------
+const PHOTO_KEY = "skin-library-photo";
+function photoPrefs() { try { return { bg: "scene", size: "2", ...JSON.parse(localStorage.getItem(PHOTO_KEY) || "{}") }; } catch (e) { return { bg: "scene", size: "2" }; } }
+function syncPhotoUi() {
+  const p = photoPrefs(), mc = st.group === "minecraft";
+  document.querySelectorAll("#prPhotoBg button").forEach(b => { b.setAttribute("aria-pressed", String(b.dataset.v === (mc ? "scene" : p.bg))); b.disabled = mc && b.dataset.v === "clear"; });
+  document.querySelectorAll("#prPhotoSize button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === p.size)));
+}
+function setPhotoPref(k, v) {
+  const p = photoPrefs(); p[k] = v;
+  try { localStorage.setItem(PHOTO_KEY, JSON.stringify(p)); } catch (e) { /* ignore */ }
+  syncPhotoUi();
+}
+/** The classic backdrops are CSS; for a photo they are painted again on the canvas. */
+function paintClassicBg(ctx, w, h) {
+  const g = (stops, lin) => {
+    const gr = lin ? ctx.createLinearGradient(0, 0, 0, h) : ctx.createRadialGradient(w / 2, h * stops.cy, 0, w / 2, h * stops.cy, Math.max(w, h) * stops.r);
+    for (const [o, c] of stops.c) gr.addColorStop(o, c);
+    ctx.fillStyle = gr; ctx.fillRect(0, 0, w, h);
+  };
+  const id = st.scene;
+  if (id === "studio") g({ cy: 0.38, r: 0.62, c: [[0, "#ffffff"], [0.5, "#eceef2"], [1, "#cdd1d8"]] });
+  else if (id === "spotlight") g({ cy: 1, r: 0.6, c: [[0, "#17140f"], [0.7, "#050506"], [1, "#050506"]] });
+  else if (id === "sunset") g({ c: [[0, "#23173f"], [0.3, "#6b2f63"], [0.55, "#d0583f"], [0.66, "#f6a356"], [0.662, "#2c1a26"], [1, "#170e15"]] }, true);
+  else g({ c: [[0, "#02060f"], [0.55, "#08142e"], [1, "#10244a"]] }, true);
+  // sun / moon discs and the particle layer, where they are shown
+  const rect = $("present").getBoundingClientRect(), k = w / rect.width;
+  for (const sel of [".pr-sun", ".pr-moon", ".pr-beam"]) {
+    const el = document.querySelector(sel);
+    if (!el || getComputedStyle(el).opacity < 0.05) continue;
+    const r = el.getBoundingClientRect(), cx = (r.left + r.width / 2 - rect.left) * k, cy = (r.top + r.height / 2 - rect.top) * k, rad = r.width / 2 * k;
+    const gr = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad);
+    if (sel === ".pr-sun") { gr.addColorStop(0, "#fff1c9"); gr.addColorStop(0.35, "#ffcf7a"); gr.addColorStop(0.6, "#ff9a4d"); gr.addColorStop(0.72, "rgba(255,120,60,0)"); }
+    else if (sel === ".pr-moon") { gr.addColorStop(0, "#ffffff"); gr.addColorStop(0.55, "#dbe6ff"); gr.addColorStop(0.98, "#b9cbf5"); gr.addColorStop(1, "rgba(185,203,245,0)"); }
+    else continue;
+    ctx.save();
+    if (sel === ".pr-sun") { ctx.beginPath(); ctx.rect(0, 0, w, cy); ctx.clip(); }   // the sun sits on the horizon
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+  const fx = $("prFx");
+  if (fx.width) ctx.drawImage(fx, 0, 0, w, h);
+}
+/** Render the scene once at a higher resolution and save it as PNG. */
+async function takePhoto() {
+  const v = st.viewer;
+  if (!v) return;
+  const p = photoPrefs(), mc = !!st.world, clear = !mc && p.bg === "clear";
+  const r = v.renderer, pr0 = r.getPixelRatio();
+  const css = v.canvas.getBoundingClientRect();
+  // stay within what the GPU can hold
+  const maxTex = Math.min(8192, r.capabilities.maxTextureSize || 4096);
+  const scale = Math.min(Number(p.size) || 1, maxTex / (Math.max(css.width, css.height) * pr0));
+  const out = document.createElement("canvas");
+  try {
+    r.setPixelRatio(pr0 * scale); v.updateComposerSize();
+    v.render();
+    out.width = v.canvas.width; out.height = v.canvas.height;
+    const ctx = out.getContext("2d");
+    if (!mc && !clear) paintClassicBg(ctx, out.width, out.height);
+    ctx.drawImage(v.canvas, 0, 0);   // right after rendering, before the frame is handed to the screen
+  } finally {
+    r.setPixelRatio(pr0); v.updateComposerSize(); v.render();
+  }
+  const skin = st.list[st.i];
+  out.toBlob(b => {
+    const url = URL.createObjectURL(b), a = document.createElement("a");
+    a.href = url; a.download = `${(skin ? skin.name : "skin").replace(/[^\w\-]+/g, "_")}-${st.scene}.png`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }, "image/png");
+  // a short flash as feedback
+  const f = document.querySelector(".pr-flash");
+  if (f && !reduce()) { f.classList.remove("on"); void f.offsetWidth; f.classList.add("on"); setTimeout(() => f.classList.remove("on"), 450); }
+}
+
+// ---------- group photo: up to four more skins beside the figure ----------
+const GROUP_MAX = 4;
+function renderGroupList() {
+  const others = st.list.filter((s, i) => i !== st.i);
+  if (!st.groupSel) st.groupSel = others.slice(0, 3).map(s => s.id);
+  $("grpOn").checked = !!st.groupOn;
+  $("grpList").replaceChildren(...others.map(s => {
+    const l = document.createElement("label");
+    l.className = "pr-check";
+    l.innerHTML = `<input type="checkbox"> <canvas width="16" height="32"></canvas> <span></span>`;
+    l.querySelector("span").textContent = s.name;
+    const cb = l.querySelector("input");
+    cb.checked = st.groupSel.includes(s.id);
+    cb.disabled = !cb.checked && st.groupSel.length >= GROUP_MAX;
+    cb.addEventListener("change", () => {
+      st.groupSel = cb.checked ? [...st.groupSel, s.id] : st.groupSel.filter(x => x !== s.id);
+      renderGroupList();
+      if (st.groupOn) buildGroup();
+    });
+    import("./skin.js").then(({ loadImage, renderFigure }) => loadImage(s.data).then(img => renderFigure(l.querySelector("canvas"), img, s.model, "front", { legacy: s.fmt === "64x32" })));
+    return l;
+  }));
+  if (!others.length) $("grpList").textContent = t("groupNone");
+}
+function clearGroup() {
+  for (const g of st.groupFigs || []) {
+    if (g.holder && g.holder.parent) g.holder.parent.remove(g.holder);
+    g.tex.dispose();
+  }
+  st.groupFigs = [];
+  cancelAnimationFrame(st.groupRaf); st.groupRaf = 0;
+  fitGroupCamera();
+}
+async function buildGroup() {
+  const v = st.viewer, kit = await load3d();
+  if (!v || !kit) return;
+  const seq = st.groupSeq = (st.groupSeq || 0) + 1;
+  clearGroup();
+  const { THREE, sv } = kit;
+  st.groupTHREE = THREE;
+  const { loadSkinToCanvas } = await import("skinview-utils");
+  const { loadImage } = await import("./skin.js");
+  const chosen = st.groupSel.map(id => st.list.find(s => s.id === id)).filter(Boolean).slice(0, GROUP_MAX);
+  // left, right, then further out, a little behind
+  const slots = [[-17, -3], [17, -3], [-34, -9], [34, -9]];
+  const figs = [];
+  for (const [i, s] of chosen.entries()) {
+    const img = await loadImage(s.data);
+    if (seq !== st.groupSeq) return;
+    const c = document.createElement("canvas");
+    loadSkinToCanvas(c, img);
+    const tex = new THREE.CanvasTexture(c);
+    tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter;
+    tex.colorSpace = st.world ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+    const po = new sv.PlayerObject();
+    po.skin.map = tex;
+    po.skin.modelType = s.model === "slim" ? "slim" : "default";
+    po.cape.visible = false; po.elytra.visible = false; if (po.ears) po.ears.visible = false;
+    po.position.set(0, 0, 0);
+    const holder = new THREE.Group();
+    holder.position.set(slots[i][0], 0, slots[i][1]);
+    holder.rotation.y = -Math.sign(slots[i][0]) * 0.18;   // turned a little towards the middle
+    holder.add(po);
+    po.traverse(o => { if (o.isMesh) { o.castShadow = !!st.world; } });
+    v.playerWrapper.add(holder);
+    figs.push({ po: po, holder, tex, phase: 0.37 * (i + 1), anim: st.motion ? makeAnim(st.anim, 0.37 * (i + 1)) : null, model: s.model });
+  }
+  st.groupFigs = figs;
+  let last = performance.now();
+  const loop = now => {
+    const dt = Math.min(0.1, (now - last) / 1000); last = now;
+    for (const f of st.groupFigs) if (f.anim) f.anim.update(f.po, dt);
+    st.groupRaf = requestAnimationFrame(loop);
+  };
+  st.groupRaf = requestAnimationFrame(loop);
+  fitGroupCamera();
+}
+/** Undo the group's step back before a block world places its camera again. */
+function unfitCamera() {
+  const v = st.viewer;
+  if (!v || !st.world || !st.camBase || (st.camFactor || 1) === 1) return;
+  const c = v.camera, tg = v.controls.target;
+  c.position.copy(tg).add(c.position.clone().sub(tg).normalize().multiplyScalar(st.camBase));
+  st.world.wantDist = st.camBase;
+  st.camFactor = 1;
+}
+/** Group figures follow the colour handling and shadows of the current scene. */
+function syncGroupLook() {
+  const kitTHREE = st.groupTHREE;
+  for (const f of st.groupFigs || []) {
+    if (kitTHREE) f.tex.colorSpace = st.world ? kitTHREE.SRGBColorSpace : kitTHREE.NoColorSpace;
+    f.tex.needsUpdate = true;
+    f.po.traverse(o => { if (o.isMesh) o.castShadow = !!st.world; });
+  }
+  fitGroupCamera();
+}
+/** Step the camera back so the whole group fits; back to normal without one. */
+function fitGroupCamera() {
+  const v = st.viewer;
+  if (!v) return;
+  const n = (st.groupFigs || []).length, f = n ? (n <= 2 ? 1.75 : 2.6) : 1;
+  const w = v.playerWrapper;
+  if (!st.world) {
+    const r = $("prStage").getBoundingClientRect();
+    v.zoom = r.width ? Math.min(0.66, 0.66 * (r.width / r.height) / 0.95) : 0.66;
+    // the classic backdrops have a fixed floor: shrink the group around the feet so everyone stands on it
+    const s = 1 / f;
+    w.scale.setScalar(s); w.position.y = -16 * (1 - s);
+    return;
+  }
+  w.scale.setScalar(1); w.position.y = 0;
+  const c = v.camera, tg = v.controls.target, d = c.position.clone().sub(tg);
+  const cur = st.world.wantDist || d.length();
+  if (!st.camBase) st.camBase = cur / (st.camFactor || 1);
+  st.camFactor = f;
+  const want = st.camBase * f;
+  v.controls.maxDistance = Math.max(v.controls.maxDistance, want + 10);
+  st.world.wantDist = want;
+  c.position.copy(tg).add(d.normalize().multiplyScalar(want));
+  v.controls.update();
+}
+function setGroupOn(on) {
+  st.groupOn = on;
+  $("grpOn").checked = on;
+  $("prGroupBtn").classList.toggle("on", on);
+  if (on) buildGroup(); else { st.groupSeq = (st.groupSeq || 0) + 1; clearGroup(); }
 }
 
 function applyRotate(on) {
@@ -591,6 +856,8 @@ export function stopPresentation() {
   if (!st.on) return;
   showUi();
   st.on = false;
+  if (st.groupOn) setGroupOn(false);
+  closeExtraPanels();
   cancelAnimationFrame(st.fx.raf);
   if (st.viewer) st.viewer.renderPaused = true;
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
@@ -613,9 +880,35 @@ export function setupPresentation() {
     const b = document.createElement("button");
     b.className = "pr-pill"; b.dataset.anim = a; b.id = "anim-" + a;
     b.innerHTML = `<span data-i18n="anim_${a}"></span>`;
-    b.addEventListener("click", () => applyAnim(a, true));
+    b.addEventListener("click", () => { applyAnim(a, true); toggleEmotes(false); });
     return b;
   }));
+  // emotes: one pill that opens the list and then shows the chosen emote
+  const eb = document.createElement("button");
+  eb.className = "pr-pill"; eb.id = "prEmoteBtn"; eb.setAttribute("aria-expanded", "false"); eb.setAttribute("aria-controls", "prEmotes");
+  eb.innerHTML = `<span data-i18n="emotes"></span> <svg class="ic sm"><use href="#i-more"/></svg>`;
+  eb.addEventListener("click", () => toggleEmotes());
+  $("prAnims").appendChild(eb);
+  $("prEmotes").replaceChildren(...EMOTES.map(a => {
+    const b = document.createElement("button");
+    b.className = "pr-pill"; b.dataset.anim = a; b.id = "emote-" + a;
+    b.innerHTML = `<span data-i18n="emote_${a}"></span>`;
+    b.addEventListener("click", () => { applyAnim(a, true); toggleEmotes(false); });
+    return b;
+  }));
+  $("prPhoto").addEventListener("click", () => toggleExtra("prPhotoPanel", "prPhoto"));
+  $("prGroupBtn").addEventListener("click", () => toggleExtra("prGroupPanel", "prGroupBtn"));
+  $("prPhotoBg").addEventListener("click", e => { const b = e.target.closest("button[data-v]"); if (b && !b.disabled) setPhotoPref("bg", b.dataset.v); });
+  $("prPhotoSize").addEventListener("click", e => { const b = e.target.closest("button[data-v]"); if (b) setPhotoPref("size", b.dataset.v); });
+  $("prPhotoSave").addEventListener("click", () => takePhoto());
+  $("grpOn").addEventListener("change", e => setGroupOn(e.target.checked));
+  $("prWeather").addEventListener("change", e => setWeather(e.target.value));
+  document.addEventListener("pointerdown", e => {
+    if (!st.on) return;
+    for (const [panel, btn] of [["prPhotoPanel", "prPhoto"], ["prGroupPanel", "prGroupBtn"], ["prEmotes", "prEmoteBtn"]]) {
+      if (!$(panel).hidden && !e.target.closest(`#${panel}, #${btn}`)) { $(panel).hidden = true; $(btn).setAttribute("aria-expanded", "false"); }
+    }
+  }, true);
   applyI18n($("present"));
   $("prPrev").addEventListener("click", () => show(st.i - 1, -1));
   $("prNext").addEventListener("click", () => show(st.i + 1, 1));
@@ -691,6 +984,8 @@ export function setupPresentation() {
     else if (e.key === "ArrowLeft") { e.preventDefault(); show(st.i - 1, -1); }
     else if (e.key === "Escape" && !$("prWorldPanel").hidden) togglePanel(false);
     else if (e.key === "Escape" && !$("prEquipPanel").hidden) toggleEquipPanel(false);
+    else if (e.key === "Escape" && ["prPhotoPanel", "prGroupPanel", "prEmotes"].some(id => !$(id).hidden)) closeExtraPanels();
+    else if (e.key.toLowerCase() === "p" && !e.ctrlKey && !e.metaKey) takePhoto();
     else if (e.key === "Escape" && document.body.classList.contains("hdr-open")) closeHeader();
     else if (e.key === "Escape" && !document.fullscreenElement) stopPresentation();
     else if (e.key === " ") { e.preventDefault(); applyRotate(!st.rotate); }

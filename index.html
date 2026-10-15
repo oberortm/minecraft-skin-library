@@ -34,6 +34,8 @@
   <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
   <symbol id="i-full" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-full-exit" viewBox="0 0 24 24"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+  <symbol id="i-group" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M6.5 20a5.5 5.5 0 0111 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="5" cy="10" r="2" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="19" cy="10" r="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M1.5 18a3.5 3.5 0 015-3M22.5 18a3.5 3.5 0 00-5-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
   <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M3 3l18 18M10.6 5.1A10 10 0 0112 5c5 0 9 4.5 10 7-.4 1-1.3 2.4-2.6 3.7M6.5 6.6C4.4 8 2.9 10 2 12c1 2.5 5 7 10 7 1.7 0 3.3-.5 4.6-1.3M9.9 9.9a3 3 0 004.2 4.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-armor" viewBox="0 0 24 24"><path d="M8 3l-4 2v6h3v10h10V11h3V5l-4-2c0 2-1.8 3.5-4 3.5S8 5 8 3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
   <symbol id="i-rotate" viewBox="0 0 24 24"><path d="M20 12a8 8 0 11-2.3-5.6M20 4v4h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
@@ -137,6 +139,8 @@
   <button class="pr-icon pr-menu" id="prMenu" data-i18n-title="showHeader"><svg class="ic"><use href="#i-menu"/></svg></button>
   <div class="pr-corner">
     <button class="pr-icon" id="prEquip" aria-expanded="false" aria-controls="prEquipPanel" data-i18n-title="equipment"><svg class="ic"><use href="#i-armor"/></svg></button>
+    <button class="pr-icon" id="prPhoto" aria-expanded="false" aria-controls="prPhotoPanel" data-i18n-title="photo"><svg class="ic"><use href="#i-camera"/></svg></button>
+    <button class="pr-icon" id="prGroupBtn" aria-expanded="false" aria-controls="prGroupPanel" data-i18n-title="groupPhoto"><svg class="ic"><use href="#i-group"/></svg></button>
     <button class="pr-icon" id="prHideUi" data-i18n-title="hideUi"><svg class="ic"><use href="#i-eye-off"/></svg></button>
     <button class="pr-icon pr-world-btn" id="prWorld" aria-expanded="false" aria-controls="prWorldPanel" data-i18n-title="settings"><svg class="ic"><use href="#i-gear"/></svg></button>
     <button class="pr-icon" id="prFull" data-i18n-title="fullscreen"><svg class="ic"><use href="#i-full"/></svg></button>
@@ -149,6 +153,22 @@
     <div id="eqArmor"></div>
     <div id="eqItems"></div>
   </div>
+  <div class="pr-panel" id="prPhotoPanel" hidden>
+    <h3 data-i18n="photo"></h3>
+    <div class="pr-panel-row"><span class="pr-panel-label" data-i18n="photoBg"></span>
+      <span class="pr-seg" id="prPhotoBg"><button type="button" data-v="scene" data-i18n="photoBgScene"></button><button type="button" data-v="clear" data-i18n="photoBgClear"></button></span></div>
+    <div class="pr-panel-row"><span class="pr-panel-label" data-i18n="photoSize"></span>
+      <span class="pr-seg" id="prPhotoSize"><button type="button" data-v="1">1×</button><button type="button" data-v="2">2×</button><button type="button" data-v="4">4×</button></span></div>
+    <p class="pr-panel-hint" id="prPhotoHint" data-i18n="photoHint"></p>
+    <button class="pr-pill" id="prPhotoSave" type="button"><svg class="ic sm"><use href="#i-camera"/></svg><span data-i18n="photoSave"></span></button>
+  </div>
+  <div class="pr-panel" id="prGroupPanel" hidden>
+    <h3 data-i18n="groupPhoto"></h3>
+    <label class="pr-check"><input type="checkbox" id="grpOn"> <span data-i18n="groupOn"></span></label>
+    <p class="pr-panel-hint" data-i18n="groupHint"></p>
+    <div class="grp-list" id="grpList"></div>
+  </div>
+  <div class="pr-panel pr-emotes" id="prEmotes" hidden></div>
   <div class="pr-tex-badge" id="prTexBadge" role="status" hidden><span data-i18n="texLoading"></span> <b id="prTexBadgePct"></b></div>
   <div class="pr-panel" id="prWorldPanel" hidden>
     <h3 data-i18n="worldSettings"></h3>
@@ -157,6 +177,15 @@
       <span class="pr-seg" id="prQuality" role="group"><button type="button" data-q="high" id="quality-high" data-i18n="qualityHigh"></button><button type="button" data-q="low" id="quality-low" data-i18n="qualityLow"></button></span>
     </div>
     <p class="pr-panel-hint pr-quality-row" data-i18n="qualityHint"></p>
+    <label class="pr-panel-row pr-quality-row">
+      <span class="pr-panel-label" data-i18n="weather"></span>
+      <select class="pr-select" id="prWeather">
+        <option value="clear" data-i18n="weather_clear"></option><option value="rain" data-i18n="weather_rain"></option>
+        <option value="snow" data-i18n="weather_snow"></option><option value="fireflies" data-i18n="weather_fireflies"></option>
+        <option value="leaves" data-i18n="weather_leaves"></option>
+      </select>
+    </label>
+    <p class="pr-panel-hint pr-quality-row" data-i18n="weatherHint"></p>
     <label class="pr-panel-row">
       <span class="pr-panel-label" data-i18n="resourcePack"></span>
       <select class="pr-select" id="prTexSource">
@@ -398,6 +427,7 @@
     "./js/player.js": "./js/player.js?v=48",
     "./js/pfp.js": "./js/pfp.js?v=48",
     "./js/edextra.js": "./js/edextra.js?v=48",
+    "./js/emotes.js": "./js/emotes.js?v=48",
     "./js/mcworld.js": "./js/mcworld.js?v=48",
     "skinview3d": "./vendor/skinview3d@3.0.1/skinview3d.js",
     "skinview-utils": "./vendor/skinview-utils@0.7.1/index.js",
@@ -439,6 +469,7 @@
 <link rel="modulepreload" href="js/player.js?v=48">
 <link rel="modulepreload" href="js/pfp.js?v=48">
 <link rel="modulepreload" href="js/edextra.js?v=48">
+<link rel="modulepreload" href="js/emotes.js?v=48">
 <link rel="modulepreload" href="js/pack.js?v=48">
 <script type="module" src="js/app.js?v=48"></script>
 </body>

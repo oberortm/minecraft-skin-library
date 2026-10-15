@@ -121,6 +121,7 @@ body.presenting .top .tagline { animation: none; }
 /* flash between skins */
 .pr-flash { position: absolute; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(circle at 50% 45%, rgba(255,255,255,.9), transparent 60%); transition: opacity .3s ease; }
 .pr-leave .pr-flash { opacity: .35; }
+.pr-flash.on { opacity: .7; transition: none; }
 
 /* leaving / entering */
 .pr-leave .pr-stage { opacity: 0; transform: translateX(calc(var(--d) * -9%)) scale(.92) rotateY(0); filter: blur(10px); }
@@ -247,3 +248,18 @@ body.hdr-open .pr-menu { background: var(--pr-ui-on); color: var(--pr-ui-on-fg);
 .eq-dye[hidden] { display: none; }
 .pr-select:disabled, .pr-check:has(input:disabled) { opacity: .45; }
 #eqAllSame { justify-self: start; }
+
+/* photo, group photo and emote panels */
+#prPhoto[aria-expanded="true"], #prGroupBtn[aria-expanded="true"], #prEmoteBtn[aria-expanded="true"] { background: var(--pr-ui-on); color: var(--pr-ui-on-fg); }
+#prPhotoSave { justify-self: start; }
+.grp-list { display: grid; gap: 6px; }
+.grp-list .pr-check { font-weight: 500; }
+.grp-list canvas { width: 12px; height: 24px; image-rendering: pixelated; }
+.pr-emotes { top: auto; bottom: calc(max(22px, env(safe-area-inset-bottom, 0px)) + 150px); right: auto; left: 50%; translate: -50% 0; width: auto; max-width: calc(100vw - 32px);
+  display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+@media (max-width: 700px) {
+  .pr-corner { left: 72px; flex-wrap: wrap; justify-content: flex-end; }
+  .pr-panel:not(.pr-emotes), .pr-tex-badge { top: calc(max(16px, env(safe-area-inset-top, 0px)) + 108px); }
+  .pr-panel:not(.pr-emotes) { max-height: calc(100dvh - 250px); }
+  .pr-info { top: max(128px, calc(env(safe-area-inset-top, 0px) + 128px)); }
+}
