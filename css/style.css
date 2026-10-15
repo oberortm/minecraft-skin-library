@@ -317,3 +317,16 @@ h3 { margin: 0; font: 500 11px var(--f-mono); text-transform: uppercase; letter-
 .empty-player { margin-top: 14px; gap: 8px; flex-wrap: wrap; }
 .empty-player input { min-width: 0; width: 220px; max-width: 100%; padding: 10px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--fg, inherit); font: inherit; }
 @media (max-width: 520px) { .player-hit { flex-wrap: wrap; } .player-hit .btn { width: 100%; justify-content: center; } }
+
+/* profile picture generator */
+.pfp-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+@media (max-width: 620px) { .pfp-body { grid-template-columns: minmax(0, 1fr); } }
+.pfp-preview canvas { width: 100%; aspect-ratio: 1; display: block; border-radius: 12px;
+  background: repeating-conic-gradient(color-mix(in srgb, var(--line) 70%, transparent) 0 25%, transparent 0 50%) 0 0 / 20px 20px; }
+.pfp-opts { display: grid; gap: 12px; }
+.pfp-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.pfp-row .seg-label { min-width: 84px; }
+.pfp-row input[type="color"] { width: 34px; height: 30px; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: none; cursor: pointer; }
+.pfp-row input[hidden] { display: none; }
+#pfpSave { justify-self: start; }
+#pfpSave .ic { transform: rotate(180deg); }

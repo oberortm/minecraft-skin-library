@@ -8,6 +8,7 @@ import { reveal, bindTilt, trackScroll, splitTitle } from "./motion.js";
 import { $, on, safe, setErrorReporter } from "./dom.js";
 import { load3d, pixelRatio } from "./view3d.js";
 import { isPlayerName, lookupPlayer } from "./player.js";
+import { openPfp, setupPfp } from "./pfp.js";
 
 // filters: slim/classic are "either", fav narrows to favourites; none active = all
 const state = { skins: [], view: "front", filters: { slim: false, classic: false, fav: false }, sort: "new", search: "", current: null };
@@ -437,6 +438,7 @@ function setupDetail() {
   toggle("dOuter", on => setOuterLayer(viewer, on));
   toggle("dRegions", async on => { regionsOn = on; const s = byId(state.current); if (s) drawTexture($("dTex"), await imageOf(s), on); });
   on("dExport", "click", () => { const s = byId(state.current); if (s) download(s.data, safeName(s.name) + ".png"); });
+  on("dPfp", "click", () => { const s = byId(state.current); if (s) openPfp(s); });
   on("dDup", "click", async () => {
     const s = byId(state.current); if (!s) return;
     const now = Date.now();
@@ -529,6 +531,7 @@ async function boot() {
   safe("ui prefs", loadUi);
   safe("i18n", () => applyI18n());
   safe("title", () => { splitTitle(document.querySelector(".top h1")); trackScroll(); });
+  safe("pfp", setupPfp);
   safe("toolbar", () => {
     seg("viewSeg", state.view, v => { state.view = v; saveUi(); renderGrid(); });
     setupFilters();

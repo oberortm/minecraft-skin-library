@@ -236,12 +236,41 @@
           <button class="btn primary" id="dEdit"><svg class="ic"><use href="#i-pencil"/></svg><span data-i18n="edit"></span></button>
           <button class="btn" id="dPresent"><svg class="ic"><use href="#i-play"/></svg><span data-i18n="present"></span></button>
           <button class="btn" id="dExport" data-i18n="exportPng"></button>
+          <button class="btn" id="dPfp" data-i18n="pfpOpen"></button>
           <button class="btn" id="dDup" data-i18n="duplicate"></button>
           <button class="btn danger" id="dDelete" data-i18n="delete"></button>
         </div>
         <div class="mc-how"><h3 data-i18n="mcHowTitle"></h3><p id="dHow"></p></div>
         <label class="notes"><h3 data-i18n="notes"></h3><textarea id="dNotes" rows="3" data-i18n-ph="notesPh"></textarea></label>
         <p class="hint" id="dAdded"></p>
+      </div>
+    </div>
+  </div>
+</dialog>
+
+<!-- Profile picture -->
+<dialog id="pfp" class="sheet narrow" aria-labelledby="pfpTitle">
+  <div class="sheet-inner">
+    <div class="sheet-top">
+      <h2 class="sheet-title" id="pfpTitle"></h2>
+      <span class="spacer"></span>
+      <button class="btn icon-only" id="pfpClose" data-i18n-title="close"><svg class="ic"><use href="#i-x"/></svg></button>
+    </div>
+    <div class="pfp-body">
+      <div class="pfp-preview"><canvas id="pfpPreview" width="512" height="512"></canvas><p class="hint" id="pfpErr" hidden data-i18n="pfpError"></p></div>
+      <div class="pfp-opts">
+        <div class="pfp-row"><span class="seg-label" data-i18n="pfpCrop"></span>
+          <span class="seg" id="pfpCrop"><button data-v="head" data-i18n="pfpHead"></button><button data-v="bust" data-i18n="pfpBust"></button><button data-v="full" data-i18n="pfpFull"></button></span></div>
+        <div class="pfp-row"><span class="seg-label" data-i18n="pfpStyle"></span>
+          <span class="seg" id="pfpStyle"><button data-v="flat" data-i18n="pfpFlat"></button><button data-v="front" data-i18n="pfp3dFront"></button><button data-v="angle" data-i18n="pfp3dAngle"></button></span></div>
+        <div class="pfp-row"><span class="seg-label" data-i18n="pfpBg"></span>
+          <span class="seg" id="pfpBg"><button data-v="none" data-i18n="pfpBgNone"></button><button data-v="color" data-i18n="pfpBgColor"></button><button data-v="gradient" data-i18n="pfpBgGradient"></button></span>
+          <input type="color" id="pfpC1" data-i18n-title="pfpColor1"><input type="color" id="pfpC2" data-i18n-title="pfpColor2"></div>
+        <div class="pfp-row"><span class="seg-label" data-i18n="pfpShape"></span>
+          <span class="seg" id="pfpShape"><button data-v="square" data-i18n="pfpSquare"></button><button data-v="rounded" data-i18n="pfpRounded"></button><button data-v="round" data-i18n="pfpRound"></button></span></div>
+        <label class="pfp-row"><span class="seg-label" data-i18n="pfpSize"></span>
+          <select id="pfpSize"><option value="128">128 px</option><option value="256">256 px</option><option value="512">512 px</option><option value="1024">1024 px</option></select></label>
+        <button class="btn primary" id="pfpSave"><svg class="ic"><use href="#i-upload"/></svg><span data-i18n="pfpSave"></span></button>
       </div>
     </div>
   </div>
@@ -359,6 +388,7 @@
     "./js/equipment.js": "./js/equipment.js?v=46",
     "./js/equipart.js": "./js/equipart.js?v=46",
     "./js/player.js": "./js/player.js?v=46",
+    "./js/pfp.js": "./js/pfp.js?v=46",
     "./js/mcworld.js": "./js/mcworld.js?v=46",
     "skinview3d": "./vendor/skinview3d@3.0.1/skinview3d.js",
     "skinview-utils": "./vendor/skinview-utils@0.7.1/index.js",
@@ -398,6 +428,7 @@
 <link rel="modulepreload" href="js/equipment.js?v=46">
 <link rel="modulepreload" href="js/equipart.js?v=46">
 <link rel="modulepreload" href="js/player.js?v=46">
+<link rel="modulepreload" href="js/pfp.js?v=46">
 <link rel="modulepreload" href="js/pack.js?v=46">
 <script type="module" src="js/app.js?v=46"></script>
 </body>
