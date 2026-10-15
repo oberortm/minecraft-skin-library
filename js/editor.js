@@ -439,8 +439,8 @@ function setShow(layer, on) {
   redraw();
 }
 function syncShow() {
-  $("eShowBase").checked = ed.show.base;
-  $("eShowOuter").checked = ed.show.outer;
+  $("eShowBase").setAttribute("aria-pressed", String(ed.show.base));
+  $("eShowOuter").setAttribute("aria-pressed", String(ed.show.outer));
   if (ed.p3d) ed.p3d.setLayers(ed.show.base, ed.show.outer);
 }
 
@@ -556,8 +556,8 @@ export function setupEditor() {
     setMode(b.dataset.v);
   });
   $("eLayer").addEventListener("click", e => { const b = e.target.closest("button[data-v]"); if (b) setLayer(b.dataset.v); });
-  $("eShowBase").addEventListener("change", e => setShow("base", e.target.checked));
-  $("eShowOuter").addEventListener("change", e => setShow("outer", e.target.checked));
+  $("eShowBase").addEventListener("click", () => setShow("base", !ed.show.base));
+  $("eShowOuter").addEventListener("click", () => setShow("outer", !ed.show.outer));
   $("eMirror").addEventListener("change", e => { ed.mirror = e.target.checked; });
   const setColor2 = hex => { ed.color2 = hex.toLowerCase(); $("eColor2").value = ed.color2; $("eHex2").value = ed.color2; };
   $("eColor2").addEventListener("input", e => setColor2(e.target.value));

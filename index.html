@@ -4,15 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Skin Library</title>
-<meta name="app-version" content="11">
+<meta name="app-version" content="12">
 <meta name="description" content="Personal Minecraft skin library in your browser: collect skins, view them in 3D and draw your own. Everything stays local.">
-<link rel="icon" href="icon.svg?v=11" type="image/svg+xml">
+<link rel="icon" href="icon.svg?v=12" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="css/style.css?v=11">
-<link rel="stylesheet" href="css/looks.css?v=11">
-<link rel="stylesheet" href="css/present.css?v=11">
+<link rel="stylesheet" href="css/style.css?v=12">
+<link rel="stylesheet" href="css/looks.css?v=12">
+<link rel="stylesheet" href="css/present.css?v=12">
 <script>
   // apply the saved theme before first paint; Studio is the only look
   (function () {
@@ -239,11 +239,14 @@
         </div>
         <p class="hint" id="eGradHint" hidden data-i18n="gradientHint"></p>
         <div class="swatches" id="eRecent" aria-label="recent"></div>
+        <h3 data-i18n="visible"></h3>
+        <div class="layer-toggles">
+          <button class="chip" type="button" id="eShowBase" aria-pressed="true" data-i18n="layerBody"></button>
+          <button class="chip" type="button" id="eShowOuter" aria-pressed="true" data-i18n="layerOuterFull"></button>
+        </div>
         <h3 data-i18n="paintOn"></h3>
         <span class="seg" id="eLayer"><button data-v="base" id="elayer-base" data-i18n="layerBase"></button><button data-v="outer" id="elayer-outer" data-i18n="layerOuter"></button></span>
         <div class="checks">
-          <label><input type="checkbox" id="eShowBase" checked> <span data-i18n="showBase"></span></label>
-          <label><input type="checkbox" id="eShowOuter" checked> <span data-i18n="showOuter"></span></label>
           <label class="tex-only"><input type="checkbox" id="eGrid" checked> <span data-i18n="grid"></span></label>
           <label class="tex-only"><input type="checkbox" id="eRegions"> <span data-i18n="regions"></span></label>
         </div>
@@ -272,25 +275,25 @@
 
 <!--
   Cache busting: every CSS/JS URL carries ?v=N. The import map below gives every module exactly one
-  versioned URL, so "./app.js" and "./app.js?v=11" never become two module instances.
+  versioned URL, so "./app.js" and "./app.js?v=12" never become two module instances.
   Raise the number everywhere in this file for each release (see README).
   Vendored libraries carry their version in the folder name instead (vendor/three@0.156.1/ ...).
 -->
 <script type="importmap">
 {
   "imports": {
-    "./js/app.js": "./js/app.js?v=11",
-    "./js/db.js": "./js/db.js?v=11",
-    "./js/dom.js": "./js/dom.js?v=11",
-    "./js/editor.js": "./js/editor.js?v=11",
-    "./js/fig3d.js": "./js/fig3d.js?v=11",
-    "./js/i18n.js": "./js/i18n.js?v=11",
-    "./js/motion.js": "./js/motion.js?v=11",
-    "./js/present.js": "./js/present.js?v=11",
-    "./js/skin.js": "./js/skin.js?v=11",
-    "./js/view3d.js": "./js/view3d.js?v=11",
-    "./js/paint3d.js": "./js/paint3d.js?v=11",
-    "./js/mcworld.js": "./js/mcworld.js?v=11",
+    "./js/app.js": "./js/app.js?v=12",
+    "./js/db.js": "./js/db.js?v=12",
+    "./js/dom.js": "./js/dom.js?v=12",
+    "./js/editor.js": "./js/editor.js?v=12",
+    "./js/fig3d.js": "./js/fig3d.js?v=12",
+    "./js/i18n.js": "./js/i18n.js?v=12",
+    "./js/motion.js": "./js/motion.js?v=12",
+    "./js/present.js": "./js/present.js?v=12",
+    "./js/skin.js": "./js/skin.js?v=12",
+    "./js/view3d.js": "./js/view3d.js?v=12",
+    "./js/paint3d.js": "./js/paint3d.js?v=12",
+    "./js/mcworld.js": "./js/mcworld.js?v=12",
     "skinview3d": "./vendor/skinview3d@3.0.1/skinview3d.js",
     "skinview-utils": "./vendor/skinview-utils@0.7.1/index.js",
     "three": "./vendor/three@0.156.1/three.module.min.js",
@@ -315,6 +318,6 @@
     }, 4000);
   });
 </script>
-<script type="module" src="js/app.js?v=11"></script>
+<script type="module" src="js/app.js?v=12"></script>
 </body>
 </html>
