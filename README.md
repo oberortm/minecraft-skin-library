@@ -120,6 +120,10 @@ Dieses Projekt ist nicht offiziell und steht in keiner Verbindung zu Mojang oder
 
 ## English
 
-A personal Minecraft skin library that runs entirely in your browser. Drop in PNG skins (64×64 or legacy 64×32), browse them front, back or as a texture, view them in 3D, paint your own directly on the 3D figure (or on the flat texture) in the built-in editor and export them as PNG. Everything is stored locally in IndexedDB; use the backup file to move your library to another device. Includes a full-screen presentation mode with two scene groups (Classic backdrops, and Minecraft-style 3D block worlds with real-time shadows, fog and bloom, all textures generated in code) and animations, plus light/dark and English/German toggles. No build step: serve the folder with any static server. Every CSS/JS URL carries a version (`?v=N`, set in `index.html`); raise it on each release so browsers never mix cached old and new files.
+A personal Minecraft skin library that runs entirely in your browser. Drop in PNG skins (64×64 or legacy 64×32), filter them (Slim, Classic and favourites combine), view them in 3D and export them as PNG. The editor paints directly on the 3D figure or on the flat texture, with pencil, eraser, noise brush, fill, gradient, picker, mirroring, separate base/outer layers and body parts you can hide to reach covered spots. Everything is stored locally in IndexedDB; use the backup file to move your library to another device.
+
+The presentation mode has two scene groups: Classic backdrops, and Minecraft-style 3D block worlds (white room, dark stage, sunrise island, moonlit night) with real-time shadows, ACES tone mapping, fog, bloom, light shafts, reflective water and soft ambient occlusion. All built-in block textures are generated in code; you can optionally load your own resource pack (.zip), which stays in your browser. A High/Low quality switch keeps it smooth on phones. Light/dark and English/German toggles are in the header.
+
+No build step: serve the folder with any static server. Every CSS/JS URL carries a version (`?v=N`, set in `index.html`); raise it on each release so browsers never mix cached old and new files.
 
 Not an official Minecraft product. Not approved by or associated with Mojang or Microsoft.
