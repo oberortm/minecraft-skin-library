@@ -5,6 +5,50 @@
 import * as THREE from "three";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
+import { Pass, FullScreenQuad } from "three/examples/jsm/postprocessing/Pass.js";
+
+/**
+ * Light shafts ("god rays") in screen space: from the sun's position on screen, blur outwards
+ * whatever is open sky (read from the scene's depth). Trees and the figure block the sky, so
+ * they cut visible beams into the light, like shader packs do.
+ */
+class GodRaysPass extends Pass {
+  constructor() {
+    super();
+    this.uniforms = {
+      tDiffuse: { value: null }, tDepth: { value: null }, sun: { value: new THREE.Vector2(0.5, 0.5) },
+      aspect: { value: 1 }, strength: { value: 0 }, color: { value: new THREE.Color() },
+    };
+    this.material = new THREE.ShaderMaterial({
+      uniforms: this.uniforms,
+      vertexShader: "varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
+      fragmentShader: `
+        uniform sampler2D tDiffuse, tDepth; uniform vec2 sun; uniform float aspect, strength; uniform vec3 color;
+        varying vec2 vUv;
+        float light(vec2 uv) {
+          if (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0) return 0.0;
+          float sky = step(0.99999, texture2D(tDepth, uv).x);
+          vec2 q = (uv - sun) * vec2(aspect, 1.0);
+          return sky * exp(-dot(q, q) * 34.0);
+        }
+        void main() {
+          vec4 base = texture2D(tDiffuse, vUv);
+          vec2 delta = (vUv - sun) * 0.9 / 48.0;
+          vec2 uv = vUv; float w = 1.0, acc = 0.0;
+          for (int i = 0; i < 48; i++) { uv -= delta; acc += light(uv) * w; w *= 0.965; }
+          gl_FragColor = vec4(base.rgb + color * (acc / 48.0) * strength, base.a);
+        }`,
+    });
+    this.fsQuad = new FullScreenQuad(this.material);
+  }
+  render(renderer, writeBuffer, readBuffer) {
+    this.uniforms.tDiffuse.value = readBuffer.texture;
+    this.uniforms.tDepth.value = readBuffer.depthTexture;
+    renderer.setRenderTarget(this.renderToScreen ? null : writeBuffer);
+    this.fsQuad.render(renderer);
+  }
+  dispose() { this.material.dispose(); this.fsQuad.dispose(); }
+}
 
 const B = 16;      // block size in skin pixels: a player is two blocks tall, as in the game
 const FEET = -16;  // y of the player's soles in skinview3d model space (measured: the model spans -16..16)
@@ -261,7 +305,7 @@ const LOOKS = {
     sky: { top: "#3a5a92", horizon: "#ffb27a", bottom: "#c88a6a", sun: sunAt(SUNRISE_AZ, 0.09), sunColor: "#ffc896", sunSize: 0.03, glow: 0.9 },
     fog: ["#f2b48a", 180, 760], hemi: ["#a8c4ff", "#7a5236", 0.72],
     key: { dir: sunAt(SUNRISE_AZ, 0.2), color: "#ffb36b", intensity: 2.4 }, fill: 0.3,
-    bloom: [0.4, 0.55, 0.85], player: [0.2, 0.45], rays: true, face: SUNRISE_AZ,
+    bloom: [0.4, 0.55, 0.85], player: [0.2, 0.45], rays: { color: "#ffc994", strength: 0.6, sprite: true }, face: SUNRISE_AZ,
   },
   "mc-night": {
     set: "land", exposure: 1.35,
@@ -270,7 +314,7 @@ const LOOKS = {
     fog: ["#101c34", 170, 700], hemi: ["#5470b8", "#0e0d10", 0.55],
     // the moon stands behind the starting camera and lights the figure's front; turn around to see it
     key: { dir: sunAt(0.75, 0.38), color: "#b4c8ff", intensity: 1.15 }, fill: 0.15, fillColor: "#c8d6ff",
-    bloom: [0.5, 0.6, 0.8], player: [0.12, 0.25],
+    bloom: [0.5, 0.6, 0.8], player: [0.12, 0.25], rays: { color: "#9fb6ff", strength: 0.35 },
   },
 };
 
@@ -311,7 +355,7 @@ export class McWorld {
     if (this.quality === "low" && r.getPixelRatio() > 1.5) { r.setPixelRatio(1.5); v.updateComposerSize(); }
     this.output = new OutputPass();
     v.composer.insertPass(this.output, 1);
-    if (this.quality === "high") this.addBloom();
+    if (this.quality === "high") { this.addBloom(); this.addRays(); }
     // the camera circles the figure; the world stays put
     v.playerWrapper.rotation.y = 0;
     v.controls.target.set(0, -2, 0);
@@ -359,6 +403,32 @@ export class McWorld {
     v.updateComposerSize();
     if (this.lookId) this.applyBloom(LOOKS[this.lookId]);
   }
+  /** Volumetric light needs the scene depth (WebGL2) and HDR targets; on weak devices the sprite stays. */
+  addRays() {
+    const v = this.viewer;
+    if (this.godRays || !this.hdr || !v.composer.renderTarget1.depthTexture) return;
+    // the composer's second buffer shares its depth image with the first (Texture.clone keeps the
+    // source); give it its own, or reading depth while writing the other buffer is a feedback loop
+    const rt2 = v.composer.renderTarget2;
+    this.sharedDepth = rt2.depthTexture;
+    rt2.depthTexture = new THREE.DepthTexture(rt2.width, rt2.height, THREE.FloatType);
+    rt2.dispose();
+    this.godRays = new GodRaysPass();
+    this.godRays.enabled = false;
+    v.composer.insertPass(this.godRays, 1);
+    v.updateComposerSize();
+    if (this.lookId) this.setLook(this.lookId, { keepCamera: true });
+  }
+  removeRays() {
+    if (!this.godRays) return;
+    const c = this.viewer.composer;
+    c.removePass(this.godRays);
+    this.godRays.dispose();
+    this.godRays = null;
+    if (this.sharedDepth) { c.renderTarget2.depthTexture.dispose(); c.renderTarget2.depthTexture = this.sharedDepth; c.renderTarget2.dispose(); this.sharedDepth = null; }
+    if (this.lookId) this.setLook(this.lookId, { keepCamera: true });
+  }
+
   removeBloom() {
     if (!this.bloom) return;
     this.viewer.composer.removePass(this.bloom);
@@ -618,13 +688,13 @@ export class McWorld {
   }
 
   // ---------- public ----------
-  setLook(id) {
+  setLook(id, { keepCamera = false } = {}) {
     const look = LOOKS[id] || LOOKS["mc-white"];
     this.lookId = id;
     const v = this.viewer, r = v.renderer;
     for (const g of Object.values(this.sets)) g.visible = false;
     this.set(look.set).visible = true;
-    if (look.face !== undefined) {
+    if (look.face !== undefined && !keepCamera) {
       // start with the sun in view, a little beside the figure
       const v0 = this.viewer, dist = v0.camera.position.distanceTo(v0.controls.target);
       const cam = v0.camera, halfW = Math.atan(Math.tan(cam.fov * Math.PI / 360) * cam.aspect);
@@ -655,7 +725,12 @@ export class McWorld {
     v.globalLight.intensity = look.player[0];
     v.cameraLight.intensity = look.player[1];
     this.applyBloom(look);
-    if (look.rays) {
+    // light shafts: real screen-space rays when available, else a soft sprite around the sun
+    if (this.godRays) {
+      this.godRays.enabled = !!look.rays;
+      if (look.rays) { this.godRays.uniforms.color.value.set(look.rays.color); this.godRays.uniforms.strength.value = look.rays.strength; }
+    }
+    if (look.rays && look.rays.sprite && !this.godRays) {
       if (!this.rays) {
         this.raysTex = raysTexture();
         this.rays = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.raysTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.38, fog: false }));
@@ -673,7 +748,18 @@ export class McWorld {
   tick() {
     const dt = Math.min(0.1, this.clock.getDelta());
     const t = this.clock.elapsedTime;
-    this.sky.position.copy(this.viewer.camera.position);
+    const cam = this.viewer.camera;
+    this.sky.position.copy(cam.position);
+    if (this.godRays && this.godRays.enabled) {
+      // where the sun (or moon) is on screen; fade the rays out when it is far outside the picture or behind us
+      const u = this.godRays.uniforms, p = this.sunScreen || (this.sunScreen = new THREE.Vector3());
+      p.copy(this.sky.material.uniforms.sunDir.value).multiplyScalar(1000).add(cam.position).project(cam);
+      const away = Math.max(Math.abs(p.x), Math.abs(p.y));
+      u.sun.value.set((p.x + 1) / 2, (p.y + 1) / 2);
+      u.aspect.value = cam.aspect;
+      const look = LOOKS[this.lookId];
+      u.strength.value = p.z > 1 ? 0 : (look.rays ? look.rays.strength : 0) * (1 - Math.min(1, Math.max(0, (away - 0.9) / 0.9)));
+    }
     if (!reduce()) {
       this.sky.material.uniforms.time.value = t;
       if (this.rays && this.rays.visible) this.rays.material.rotation = t * 0.02;
@@ -694,6 +780,7 @@ export class McWorld {
   lower() {
     this.quality = "low";
     this.removeBloom();
+    this.removeRays();
     for (const l of [this.key, this.spot]) {
       if (!l) continue;
       l.shadow.mapSize.set(1024, 1024);
@@ -714,6 +801,8 @@ export class McWorld {
     for (const d of this.disposables) d.dispose();
     for (const t of this.textures.values()) t.dispose();
     for (const m of this.materials.values()) m.dispose();
+    this.lookId = null;
+    this.removeRays();
     this.removeBloom();
     v.composer.removePass(this.output);
     this.output.dispose();
