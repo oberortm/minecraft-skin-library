@@ -522,6 +522,8 @@ export async function openEditor(skin, onSave) {
   syncHistory();
   applyI18n($("editor"));
   $("editor").showModal();
+  // the dialog would focus the name field first; start on the active tool so shortcuts (B, N, V …) work at once
+  $("tool-" + ed.tool).focus({ preventScroll: true });
   ed.open = true;
   let mode = "3d";
   try { if (localStorage.getItem(MODE_KEY) === "tex") mode = "tex"; } catch (e) { /* ignore */ }
