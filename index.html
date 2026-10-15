@@ -4,14 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Skin Library</title>
+<meta name="app-version" content="5">
 <meta name="description" content="Personal Minecraft skin library in your browser: collect skins, view them in 3D and draw your own. Everything stays local.">
-<link rel="icon" href="icon.svg?v=3" type="image/svg+xml">
+<link rel="icon" href="icon.svg?v=5" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="css/style.css">
-<link rel="stylesheet" href="css/looks.css">
-<link rel="stylesheet" href="css/present.css">
+<link rel="stylesheet" href="css/style.css?v=5">
+<link rel="stylesheet" href="css/looks.css?v=5">
+<link rel="stylesheet" href="css/present.css?v=5">
 <script>
   // apply the saved theme before first paint; Studio is the only look
   (function () {
@@ -247,7 +248,44 @@
   </div>
 </dialog>
 
-<script src="vendor/skinview3d/skinview3d.bundle.js"></script>
-<script type="module" src="js/app.js"></script>
+<!--
+  Cache busting: every CSS/JS URL carries ?v=5. The import map below gives every module exactly one
+  versioned URL, so "./app.js" and "./app.js?v=5" never become two module instances.
+  Raise the number everywhere in this file for each release (see README).
+-->
+<script type="importmap">
+{
+  "imports": {
+    "./js/app.js": "./js/app.js?v=5",
+    "./js/db.js": "./js/db.js?v=5",
+    "./js/dom.js": "./js/dom.js?v=5",
+    "./js/editor.js": "./js/editor.js?v=5",
+    "./js/fig3d.js": "./js/fig3d.js?v=5",
+    "./js/i18n.js": "./js/i18n.js?v=5",
+    "./js/motion.js": "./js/motion.js?v=5",
+    "./js/present.js": "./js/present.js?v=5",
+    "./js/skin.js": "./js/skin.js?v=5"
+  }
+}
+</script>
+<script>
+  // last line of defence: if the app could not start (e.g. a file failed to load), say so instead of a dead page
+  window.addEventListener("load", function () {
+    setTimeout(function () {
+      if (window.__skinLibraryBooted) return;
+      var de = document.documentElement.lang === "de";
+      var el = document.createElement("div");
+      el.className = "boot-fail";
+      el.setAttribute("role", "alert");
+      el.innerHTML = de
+        ? "Die Seite konnte nicht vollständig laden. <button type=\"button\">Neu laden</button>"
+        : "The page could not load completely. <button type=\"button\">Reload</button>";
+      el.querySelector("button").onclick = function () { location.reload(); };
+      document.body.appendChild(el);
+    }, 4000);
+  });
+</script>
+<script src="vendor/skinview3d/skinview3d.bundle.js?v=5"></script>
+<script type="module" src="js/app.js?v=5"></script>
 </body>
 </html>

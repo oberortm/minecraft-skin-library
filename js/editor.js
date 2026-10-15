@@ -2,7 +2,7 @@ import { t, applyI18n } from "./i18n.js";
 import { renderFigure, figureToTexture, faceAt, faceList, legacyTo64, blankTemplate, loadImage } from "./skin.js";
 import { drawRegions, setOuterLayer } from "./app.js";
 
-const $ = id => document.getElementById(id);
+import { $ } from "./dom.js";
 const S = 10; // texture canvas scale (64 px -> 640 px)
 const RECENT_KEY = "skin-library-recent-colors";
 
@@ -278,8 +278,8 @@ async function save(asCopy) {
   close();
 }
 
-// ---------- wiring (once) ----------
-function setup() {
+// ---------- wiring (once, called from boot) ----------
+export function setupEditor() {
   bindPaint($("eTex"), texPoint);
   bindPaint($("eFront"), e => figurePoint($("eFront"), "front", e));
   bindPaint($("eBack"), e => figurePoint($("eBack"), "back", e));
@@ -318,4 +318,3 @@ function setup() {
     if (map[e.key.toLowerCase()]) setTool(map[e.key.toLowerCase()]);
   });
 }
-setup();

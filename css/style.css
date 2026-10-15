@@ -262,3 +262,9 @@ h3 { margin: 0; font: 500 11px var(--f-mono); text-transform: uppercase; letter-
 .f3-rig, .f3-box { position: absolute; left: 0; top: 0; transform-style: preserve-3d; }
 .f3-box i { position: absolute; left: 0; top: 0; background-image: var(--skin); background-size: calc(var(--u) * 64) calc(var(--u) * 64);
   background-repeat: no-repeat; image-rendering: pixelated; backface-visibility: hidden; }
+
+/* shown by index.html only when the app failed to start */
+.boot-fail { position: fixed; z-index: 90; left: 50%; bottom: max(16px, env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+  width: min(460px, calc(100vw - 32px)); display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between;
+  background: var(--danger); color: #fff; padding: 10px 14px; border-radius: 10px; box-shadow: var(--shadow); font-size: 14px; }
+.boot-fail button { font-weight: 600; background: #fff; color: var(--danger); border: 0; border-radius: 999px; padding: 6px 14px; cursor: pointer; }

@@ -1,7 +1,7 @@
 // Presentation mode: one skin at a time, full screen, in a lit scene.
 import { t, getLang, applyI18n } from "./i18n.js";
 
-const $ = id => document.getElementById(id);
+import { $ } from "./dom.js";
 const KEY = "skin-library-present";
 const reduce = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 

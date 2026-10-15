@@ -132,6 +132,7 @@ const STRINGS = {
     backupLoaded: "{n} Skins aus dem Backup geladen",
     backupBad: "Diese Datei ist kein gültiges Backup",
     storageError: "Speichern im Browser hat nicht geklappt. Ist der private Modus an?",
+    partFailed: "Ein Teil der Seite konnte nicht starten. Der Rest funktioniert weiter; lade die Seite neu, falls etwas fehlt.",
     regionNames: {
       head: "Kopf", hat: "Hut-Schicht", body: "Körper", jacket: "Jacke",
       rightArm: "R. Arm", leftArm: "L. Arm", rightLeg: "R. Bein", leftLeg: "L. Bein",
@@ -267,6 +268,7 @@ const STRINGS = {
     backupLoaded: "Loaded {n} skins from the backup",
     backupBad: "This file is not a valid backup",
     storageError: "Saving in the browser failed. Is private mode on?",
+    partFailed: "Part of the page could not start. Everything else keeps working; reload the page if something is missing.",
     regionNames: {
       head: "Head", hat: "Hat layer", body: "Body", jacket: "Jacket",
       rightArm: "R. arm", leftArm: "L. arm", rightLeg: "R. leg", leftLeg: "L. leg",

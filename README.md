@@ -54,6 +54,18 @@ python3 -m http.server 8000
 
 Dann http://localhost:8000 öffnen.
 
+## Neue Version veröffentlichen (Cache-Busting)
+
+GitHub Pages lässt Browser Dateien bis zu 10 Minuten cachen. Damit nie altes und neues JavaScript gemischt wird, hängt an jeder CSS- und JS-URL eine Versionsnummer (`?v=5`). Alles steht in **einer** Datei, `index.html`: Stylesheets, Skripte und die Import-Map, die jedem Modul genau eine versionierte URL gibt (so entstehen keine doppelten Modul-Instanzen).
+
+**Bei jedem Release die Nummer erhöhen**, z. B. von 5 auf 6:
+
+```bash
+sed -i 's/?v=5"/?v=6"/g; s/name="app-version" content="5"/name="app-version" content="6"/' index.html
+```
+
+Neue Module in `js/` müssen zusätzlich in der Import-Map in `index.html` eingetragen werden. Startet ein Teil der App nicht (fehlendes Element, Fehler), laufen die anderen Knöpfe weiter und es erscheint ein Hinweis statt einer toten Seite.
+
 ## Aufbau
 
 ```
@@ -68,6 +80,7 @@ js/fig3d.js         3D-Figuren aus CSS-Boxen für die Karten (ohne WebGL)
 js/motion.js        Einblenden beim Scrollen, Titel-Animation
 js/present.js       Präsentationsmodus
 js/db.js            Speicher (IndexedDB)
+js/dom.js           Fehlertolerante DOM-Helfer für den Start
 js/i18n.js          Texte auf Deutsch und Englisch
 vendor/skinview3d   3D-Ansicht (MIT-Lizenz)
 ```

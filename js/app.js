@@ -1,12 +1,12 @@
 import { t, applyI18n, setLang, getLang } from "./i18n.js";
 import { db, newId, askPersist } from "./db.js";
 import { renderFigure, detectModel, loadImage, REGIONS } from "./skin.js";
-import { openEditor, editorOpen } from "./editor.js";
+import { openEditor, editorOpen, setupEditor } from "./editor.js";
 import { startPresentation, stopPresentation, presenting, setupPresentation } from "./present.js";
 import { buildFigure } from "./fig3d.js";
 import { reveal, bindTilt, trackScroll, splitTitle } from "./motion.js";
+import { $, on, safe, setErrorReporter } from "./dom.js";
 
-const $ = id => document.getElementById(id);
 const state = { skins: [], view: "front", filter: "all", sort: "new", search: "", current: null };
 const UI_KEY = "skin-library-ui";
 
@@ -169,9 +169,9 @@ function setupDrop() {
     importFiles(Array.from(e.dataTransfer.files).filter(f => f.type === "image/png" || /\.png$/i.test(f.name)));
   });
   const pick = () => $("fileInput").click();
-  $("importBtn").addEventListener("click", pick);
-  $("emptyImportBtn").addEventListener("click", pick);
-  $("fileInput").addEventListener("change", e => { importFiles(Array.from(e.target.files)); e.target.value = ""; });
+  on("importBtn", "click", pick);
+  on("emptyImportBtn", "click", pick);
+  on("fileInput", "change", e => { importFiles(Array.from(e.target.files)); e.target.value = ""; });
 }
 
 // ---------- backup ----------
@@ -312,7 +312,7 @@ function disarmDelete() {
 
 function setupDetail() {
   const d = $("detail");
-  $("dClose").addEventListener("click", () => d.close());
+  on("dClose", "click", () => d.close());
   d.addEventListener("click", e => { if (e.target === d) d.close(); });
   d.addEventListener("close", () => { state.current = null; renderGrid(); });
   d.addEventListener("keydown", e => {
@@ -320,16 +320,16 @@ function setupDetail() {
     if (e.key === "ArrowRight") step(1);
     if (e.key === "ArrowLeft") step(-1);
   });
-  $("dPrev").addEventListener("click", () => step(-1));
-  $("dNext").addEventListener("click", () => step(1));
-  $("dName").addEventListener("change", e => {
+  on("dPrev", "click", () => step(-1));
+  on("dNext", "click", () => step(1));
+  on("dName", "change", e => {
     const skin = byId(state.current); if (!skin) return;
     const name = e.target.value.trim() || t("untitled");
     e.target.value = name; updateSkin(skin, { name });
   });
-  $("dNotes").addEventListener("change", e => { const skin = byId(state.current); if (skin) updateSkin(skin, { notes: e.target.value }); });
-  $("dFav").addEventListener("click", () => { const skin = byId(state.current); if (!skin) return; updateSkin(skin, { fav: !skin.fav }); syncFav(skin); });
-  const toggle = (id, fn) => $(id).addEventListener("click", e => {
+  on("dNotes", "change", e => { const skin = byId(state.current); if (skin) updateSkin(skin, { notes: e.target.value }); });
+  on("dFav", "click", () => { const skin = byId(state.current); if (!skin) return; updateSkin(skin, { fav: !skin.fav }); syncFav(skin); });
+  const toggle = (id, fn) => on(id, "click", e => {
     const b = e.currentTarget, on = b.getAttribute("aria-pressed") !== "true";
     b.setAttribute("aria-pressed", String(on)); fn(on);
   });
@@ -337,15 +337,15 @@ function setupDetail() {
   toggle("dWalk", on => { if (viewer) viewer.animation = on ? Object.assign(new skinview3d.WalkingAnimation(), { speed: 0.6 }) : null; });
   toggle("dOuter", on => setOuterLayer(viewer, on));
   toggle("dRegions", async on => { regionsOn = on; const s = byId(state.current); if (s) drawTexture($("dTex"), await imageOf(s), on); });
-  $("dExport").addEventListener("click", () => { const s = byId(state.current); if (s) download(s.data, safeName(s.name) + ".png"); });
-  $("dDup").addEventListener("click", async () => {
+  on("dExport", "click", () => { const s = byId(state.current); if (s) download(s.data, safeName(s.name) + ".png"); });
+  on("dDup", "click", async () => {
     const s = byId(state.current); if (!s) return;
     const now = Date.now();
     const copy = { ...s, id: newId(), name: (s.name + " " + t("copySuffix")).slice(0, 60), fav: false, created: now, updated: now };
     try { await db.put(copy); } catch (e) { toast(t("storageError"), true); return; }
     state.skins.push(copy); toast(t("duplicated")); openDetail(copy.id);
   });
-  $("dDelete").addEventListener("click", async () => {
+  on("dDelete", "click", async () => {
     if (!deleteArmed) {
       deleteArmed = true; $("dDelete").classList.add("armed"); $("dDelete").textContent = t("deleteConfirm");
       deleteTimer = setTimeout(disarmDelete, 3500); return;
@@ -355,7 +355,7 @@ function setupDetail() {
     state.skins = state.skins.filter(s => s.id !== id);
     d.close(); toast(t("deleted"));
   });
-  $("dEdit").addEventListener("click", () => {
+  on("dEdit", "click", () => {
     const s = byId(state.current); if (!s) return;
     d.close();
     startEditor(s);
@@ -414,37 +414,63 @@ function drawEmptyFigure() {
 }
 
 // ---------- boot ----------
+// Every part is wired on its own: if one fails (missing element, 3D unavailable, ...),
+// the others still work and the user sees a short message instead of a dead page.
+let lastErr = 0;
+function reportError() {
+  if (Date.now() - lastErr < 4000) return;
+  lastErr = Date.now();
+  toast(t("partFailed"), true);
+}
+
 async function boot() {
-  splitTitle(document.querySelector(".top h1"));
-  trackScroll();
-  loadUi();
-  applyI18n();
-  seg("viewSeg", state.view, v => { state.view = v; saveUi(); renderGrid(); });
-  seg("filterSeg", state.filter, v => { state.filter = v; saveUi(); renderGrid(); });
-  $("sortSelect").value = state.sort;
-  $("sortSelect").addEventListener("change", e => { state.sort = e.target.value; saveUi(); renderGrid(); });
-  $("searchInput").addEventListener("input", e => { state.search = e.target.value; renderGrid(); });
-  syncThemeBtn(); syncLangBtn();
-  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", syncThemeBtn);
-  $("themeBtn").addEventListener("click", toggleTheme);
-  $("langBtn").addEventListener("click", () => {
-    setLang(getLang() === "en" ? "de" : "en"); syncLangBtn(); renderGrid();
-    if ($("detail").open && state.current) openDetail(state.current);
+  setErrorReporter(reportError);
+  window.addEventListener("error", e => { if (e.error) reportError(); });
+  window.addEventListener("unhandledrejection", () => reportError());
+  safe("ui prefs", loadUi);
+  safe("i18n", () => applyI18n());
+  safe("title", () => { splitTitle(document.querySelector(".top h1")); trackScroll(); });
+  safe("toolbar", () => {
+    seg("viewSeg", state.view, v => { state.view = v; saveUi(); renderGrid(); });
+    seg("filterSeg", state.filter, v => { state.filter = v; saveUi(); renderGrid(); });
+    $("sortSelect").value = state.sort;
+    on("sortSelect", "change", e => { state.sort = e.target.value; saveUi(); renderGrid(); });
+    on("searchInput", "input", e => { state.search = e.target.value; renderGrid(); });
   });
-  $("presentBtn").addEventListener("click", () => presenting() ? stopPresentation() : present(null));
-  $("dPresent").addEventListener("click", () => present(state.current));
-  $("newBtn").addEventListener("click", () => startEditor(null));
-  $("emptyNewBtn").addEventListener("click", () => startEditor(null));
-  document.addEventListener("click", e => { if (!e.target.closest("#moreMenu")) $("moreMenu").open = false; });
-  setupPresentation();
-  $("backupExportBtn").addEventListener("click", () => { $("moreMenu").open = false; exportBackup(); });
-  $("backupImportBtn").addEventListener("click", () => { $("moreMenu").open = false; $("backupInput").click(); });
-  $("backupInput").addEventListener("change", e => { const f = e.target.files[0]; if (f) importBackup(f); e.target.value = ""; });
-  setupDrop();
-  setupDetail();
-  drawEmptyFigure();
+  safe("theme", () => {
+    syncThemeBtn();
+    matchMedia("(prefers-color-scheme: dark)").addEventListener("change", syncThemeBtn);
+    on("themeBtn", "click", toggleTheme);
+  });
+  safe("language", () => {
+    syncLangBtn();
+    on("langBtn", "click", () => {
+      setLang(getLang() === "en" ? "de" : "en"); syncLangBtn(); renderGrid();
+      if ($("detail").open && state.current) openDetail(state.current);
+    });
+  });
+  safe("new skin", () => {
+    on("newBtn", "click", () => startEditor(null));
+    on("emptyNewBtn", "click", () => startEditor(null));
+  });
+  safe("import", setupDrop);
+  safe("presentation buttons", () => {
+    on("presentBtn", "click", () => presenting() ? stopPresentation() : present(null));
+    on("dPresent", "click", () => present(state.current));
+  });
+  safe("backup", () => {
+    document.addEventListener("click", e => { if (!e.target.closest("#moreMenu")) $("moreMenu").open = false; });
+    on("backupExportBtn", "click", () => { $("moreMenu").open = false; exportBackup(); });
+    on("backupImportBtn", "click", () => { $("moreMenu").open = false; $("backupInput").click(); });
+    on("backupInput", "change", e => { const f = e.target.files[0]; if (f) importBackup(f); e.target.value = ""; });
+  });
+  safe("detail", setupDetail);
+  safe("editor", setupEditor);
+  safe("presentation", setupPresentation);
+  safe("empty state", drawEmptyFigure);
+  window.__skinLibraryBooted = true;
   try { state.skins = await db.all(); } catch (e) { state.skins = []; toast(t("storageError"), true); }
-  renderGrid();
+  safe("grid", renderGrid);
 }
 
 boot();
