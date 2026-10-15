@@ -1,5 +1,5 @@
 // Presentation mode: one skin at a time, full screen, in a lit scene.
-import { t, getLang, applyI18n } from "./i18n.js";
+import { t, applyI18n } from "./i18n.js";
 
 import { $ } from "./dom.js";
 import { load3d } from "./view3d.js";
@@ -209,7 +209,7 @@ function fillInfo(skin) {
   const n = st.list.length;
   $("prCount").textContent = `${String(st.i + 1).padStart(2, "0")} / ${String(n).padStart(2, "0")}`;
   $("prName").textContent = skin.name;
-  $("prMeta").textContent = `${skin.model === "slim" ? t("modelSlim") : t("modelClassic")}   ${t("added")} ${new Date(skin.created).toLocaleDateString(getLang())}`;
+  $("prMeta").textContent = skin.model === "slim" ? t("modelSlim") : t("modelClassic");
   const big = $("prBig");
   big.replaceChildren(...[0, 1].map(() => { const s = document.createElement("span"); s.textContent = skin.name + " · "; return s; }));
 }
