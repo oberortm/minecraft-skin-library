@@ -116,6 +116,10 @@ const TEX = {
     if (x === 15 || y === 15) f *= 0.75;
     return shade(hex("#3a3541"), f);
   }),
+  panel: s => paint(s, (x, y, r) => {
+    const edge = x === 0 || y === 0 || x === 15 || y === 15;
+    return edge ? shade(hex("#d9d6cd"), 0.95 + r() * 0.05) : shade(hex("#fffaf0"), 0.97 + r() * 0.03);
+  }),
   glowAmber: s => paint(s, (x, y, r, n) => shade(hex("#ffc163"), 0.7 + r() * 0.3 + n(x / 2, y / 2) * 0.3)),
   glowCyan: s => paint(s, (x, y, r) => {
     const d = Math.max(Math.abs(x - 7.5), Math.abs(y - 7.5));
@@ -144,6 +148,7 @@ const BLOCKS = {
   darkBrick: { faces: "darkBrick" },
   darkPolished: { faces: "darkPolished" },
   glowAmber: { faces: "glowAmber", glow: ["#ffb347", 2.4] },
+  panel: { faces: ["quartz", "quartz", "quartz", "panel", "quartz", "quartz"], glow: ["#fff6e6", 1.5] },
   glowCyan: { faces: "glowCyan", glow: ["#6ff0e0", 2.2] },
 };
 const SEETHROUGH = new Set(["leaves"]);
@@ -232,8 +237,8 @@ const LOOKS = {
     set: "roomWhite", exposure: 0.95,
     sky: { top: "#f4f5f7", horizon: "#ffffff", bottom: "#e9eaee", sun: sunAt(0.6, 1.0), sunColor: "#ffffff", sunSize: 0.0001, glow: 0 },
     fog: ["#f3f3f1", 260, 900], hemi: ["#ffffff", "#d9d6cf", 1.15],
-    key: { dir: sunAt(0.55, 0.95), color: "#fff6ea", intensity: 1.7 }, fill: 0.35,
-    bloom: [0.18, 0.4, 0.92], player: [0.25, 0.25],
+    key: { dir: sunAt(0.55, 1.3), color: "#fff6ea", intensity: 1.45 }, fill: 0.35,
+    bloom: [0.22, 0.45, 0.9], player: [0.25, 0.3],
   },
   "mc-dark": {
     set: "roomDark", exposure: 1.15,
@@ -385,7 +390,7 @@ export class McWorld {
   }
 
   /** Turn a list of [type, x, y, z] grid cells into one InstancedMesh per block type, skipping buried blocks. */
-  buildBlocks(cells, seed) {
+  buildBlocks(cells, seed, { shadows = true } = {}) {
     const group = new THREE.Group();
     const solid = new Set();
     for (const [type, x, y, z] of cells) if (!SEETHROUGH.has(type)) solid.add(x + "," + y + "," + z);
@@ -411,7 +416,7 @@ export class McWorld {
         const k = 0.9 + r() * 0.1;
         mesh.setColorAt(i, col.setRGB(k, k, k));
       });
-      mesh.castShadow = true;
+      mesh.castShadow = shadows;
       mesh.receiveShadow = true;
       mesh.frustumCulled = false;
       group.add(mesh);
@@ -421,7 +426,8 @@ export class McWorld {
 
   /** A square room with a plinth in the middle; big enough that the orbiting camera stays inside. */
   buildRoom(white) {
-    const cells = [], R = 12, H = 7;
+    // the white room is a little taller and has a ceiling with light panels
+    const cells = [], R = 12, H = white ? 9 : 7;
     const floorA = white ? "quartzTile" : "darkPolished", floorB = white ? "quartz" : "dark";
     for (let x = -R; x <= R; x++) for (let z = -R; z <= R; z++) {
       cells.push([(x + z) % 2 === 0 ? floorA : floorB, x, -1, z]);
@@ -441,6 +447,15 @@ export class McWorld {
     // plinth: the figure stands on a 3x3 platform one step above the floor
     for (let x = -1; x <= 1; x++) for (let z = -1; z <= 1; z++) cells.push([white ? "pillar" : "darkPolished", x, 0, z]);
     const g = this.buildBlocks(dedupe(cells), white ? 11 : 12);
+    if (white) {
+      const ceiling = [];
+      for (let x = -R; x <= R; x++) for (let z = -R; z <= R; z++) {
+        const lit = Math.abs(x) <= R - 2 && Math.abs(z) <= R - 2 && ((x + 64) % 4) < 2 && ((z + 64) % 4) < 2;
+        ceiling.push([lit ? "panel" : "quartz", x, H, z]);
+      }
+      // the ceiling does not cast shadows, so the soft key light from above still reaches the floor
+      g.add(this.buildBlocks(ceiling, 13, { shadows: false }));
+    }
     if (!white) {
       // a few accent lights next to glowing blocks (no shadows, cheap)
       for (const [x, z, c] of [[R - 1, 4, "#ffb347"], [-R + 1, -4, "#6ff0e0"], [4, -R + 1, "#ffb347"], [-4, R - 1, "#6ff0e0"]]) {
