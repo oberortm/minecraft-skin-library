@@ -137,15 +137,23 @@
       <span class="pr-seg" id="prQuality" role="group"><button type="button" data-q="high" id="quality-high" data-i18n="qualityHigh"></button><button type="button" data-q="low" id="quality-low" data-i18n="qualityLow"></button></span>
     </div>
     <p class="pr-panel-hint" data-i18n="qualityHint"></p>
-    <div class="pr-panel-row">
+    <label class="pr-panel-row">
       <span class="pr-panel-label" data-i18n="resourcePack"></span>
+      <select class="pr-select" id="prTexSource">
+        <option value="builtin" data-i18n="texBuiltin"></option>
+        <option value="vanilla" data-i18n="texVanilla"></option>
+        <option value="faithful">Faithful 32x</option>
+        <option value="barebones">Bare Bones</option>
+        <option value="staytrue">Stay True</option>
+        <option value="file" data-i18n="texFile"></option>
+      </select>
+    </label>
+    <div class="pr-progress" id="prPackProgress" hidden><progress id="prPackBar" max="1"></progress><span id="prPackPct"></span></div>
+    <div class="pr-panel-row" id="prPackFileRow" hidden>
       <span class="pr-pack-name" id="prPackName"></span>
-    </div>
-    <div class="pr-panel-row">
       <button class="pr-pill" id="prPackPick" type="button" data-i18n="packChoose"></button>
-      <button class="pr-pill" id="prPackClear" type="button" data-i18n="packRemove" hidden></button>
     </div>
-    <p class="pr-panel-hint" id="prPackHint" data-i18n="packHint"></p>
+    <p class="pr-panel-hint" id="prPackHint"></p>
     <input type="file" id="prPackInput" accept=".zip,application/zip" hidden>
   </div>
   <button class="pr-nav prev" id="prPrev" data-i18n-title="prev"><svg class="ic"><use href="#i-left"/></svg></button>

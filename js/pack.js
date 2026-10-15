@@ -1,6 +1,8 @@
-// Optional resource pack for the Minecraft scenes. The user picks a pack (.zip) from their own
-// Minecraft install; only the few block textures the scenes use are unpacked and kept in this
-// browser (its own IndexedDB, separate from the skins). Nothing is uploaded or published.
+// Texture sources for the Minecraft scenes. By default everything is drawn in code (mcworld.js).
+// On request the browser downloads the original textures straight from the official source
+// (Mojang's game files, or a resource pack on Modrinth) or reads a pack the user picks. Only the
+// few textures the scenes use are unpacked and kept in this browser (its own IndexedDB, separate
+// from the skins). Nothing is part of this website or uploaded anywhere.
 
 const DB_NAME = "skin-library-pack";
 const STORE = "pack";
@@ -72,11 +74,11 @@ async function toCanvas(blob, tint) {
   return c;
 }
 
-/** Read a resource pack file; returns { name, blobs: { texName: Blob } } with the textures it has. */
-export async function readPack(file) {
+/** Pick the textures we use out of a pack/jar. Returns { name, blobs: { texName: Blob } }. */
+export async function readPackBuffer(buf, name) {
   if (!("DecompressionStream" in window)) throw new Error("unsupported");
-  const want = name => /assets\/minecraft\/textures\/blocks?\/[^/]+\.png$/i.test(name);
-  const files = await readZip(await file.arrayBuffer(), want);
+  const want = n => /assets\/minecraft\/textures\/[^]+\.png$/i.test(n) && Object.values(FILES).some(([paths]) => paths.some(p => n.toLowerCase().endsWith("assets/minecraft/textures/" + p + ".png")));
+  const files = await readZip(buf, want);
   const blobs = {};
   for (const [tex, [paths]] of Object.entries(FILES)) {
     for (const path of paths) {
@@ -85,7 +87,80 @@ export async function readPack(file) {
     }
   }
   if (!Object.keys(blobs).length) throw new Error("no textures");
-  return { name: file.name.replace(/\.zip$/i, ""), blobs };
+  return { name, blobs };
+}
+
+/** Read a resource pack file the user picked. */
+export async function readPack(file) {
+  return readPackBuffer(await file.arrayBuffer(), file.name.replace(/\.zip$/i, ""));
+}
+
+// ---------- downloadable sources ----------
+/** What the texture menu offers. "builtin" = drawn in code, "file" = a .zip the user picks. */
+export const SOURCES = [
+  { id: "builtin" },
+  { id: "vanilla", name: "Minecraft", page: "https://www.minecraft.net/" },
+  { id: "faithful", name: "Faithful 32x", slug: "faithful-32x", page: "https://modrinth.com/resourcepack/faithful-32x" },
+  { id: "barebones", name: "Bare Bones", slug: "bare-bones", page: "https://modrinth.com/resourcepack/bare-bones" },
+  { id: "staytrue", name: "Stay True", slug: "stay-true", page: "https://www.curseforge.com/minecraft/texture-packs/stay-true" },
+  { id: "file" },
+];
+
+async function fetchJson(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error("http " + r.status);
+  return r.json();
+}
+
+/** Download with progress (0..1, or -1 when the size is unknown). */
+async function fetchBytes(url, onProgress) {
+  const r = await fetch(url);
+  if (!r.ok || !r.body) throw new Error("http " + r.status);
+  const total = Number(r.headers.get("content-length")) || 0, reader = r.body.getReader(), parts = [];
+  let got = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    parts.push(value); got += value.length;
+    onProgress(total ? got / total : -1);
+  }
+  const out = new Uint8Array(got);
+  let o = 0; for (const p of parts) { out.set(p, o); o += p.length; }
+  return out.buffer;
+}
+
+/** The newest release's client.jar from Mojang, which holds the original textures. */
+async function vanillaUrl() {
+  const manifest = await fetchJson("https://piston-meta.mojang.com/mc/game/version_manifest_v2.json");
+  const id = manifest.latest.release;
+  const ver = await fetchJson(manifest.versions.find(v => v.id === id).url);
+  return { url: ver.downloads.client.url, name: "Minecraft " + id };
+}
+
+/** The newest file of a resource pack on Modrinth (found by slug, else by name). */
+async function modrinthUrl(src) {
+  const api = "https://api.modrinth.com/v2";
+  let slug = src.slug, versions;
+  try { versions = await fetchJson(`${api}/project/${slug}/version`); }
+  catch (e) {
+    const q = encodeURIComponent(src.name), facets = encodeURIComponent('[["project_type:resourcepack"]]');
+    const hit = (await fetchJson(`${api}/search?query=${q}&facets=${facets}`)).hits.find(h => h.title.toLowerCase() === src.name.toLowerCase());
+    if (!hit) throw new Error("not found");
+    slug = hit.slug; versions = await fetchJson(`${api}/project/${slug}/version`);
+  }
+  const files = versions[0] && versions[0].files;
+  const file = files && (files.find(f => f.primary) || files[0]);
+  if (!file) throw new Error("no file");
+  return { url: file.url, name: src.name };
+}
+
+/** Download a source and unpack the textures we need. onProgress(0..1). */
+export async function downloadSource(id, onProgress) {
+  const src = SOURCES.find(s => s.id === id);
+  const { url, name } = id === "vanilla" ? await vanillaUrl() : await modrinthUrl(src);
+  const buf = await fetchBytes(url, p => onProgress(p));
+  onProgress(1);
+  return readPackBuffer(buf, name);
 }
 
 /** Decode stored blobs into canvases for the world. */
@@ -115,6 +190,15 @@ function tx(mode, fn) {
     t.onerror = () => reject(t.error);
   }));
 }
-export const savePack = pack => tx("readwrite", s => s.put(pack, "current"));
-export const loadPack = () => tx("readonly", s => s.get("current")).catch(() => null);
-export const clearPack = () => tx("readwrite", s => s.delete("current"));
+const SOURCE_KEY = "skin-library-texture-source";
+/** Which source is selected ("builtin" by default; an older single saved pack counts as "file"). */
+export async function selectedSource() {
+  try { const v = localStorage.getItem(SOURCE_KEY); if (SOURCES.some(s => s.id === v)) return v; } catch (e) { /* ignore */ }
+  const old = await tx("readonly", st => st.get("current")).catch(() => null);
+  return old ? "file" : "builtin";
+}
+export function selectSource(id) { try { localStorage.setItem(SOURCE_KEY, id); } catch (e) { /* ignore */ } }
+/** Stored packs, one per source; "file" also finds the pack saved by earlier versions. */
+export const savePack = (id, pack) => tx("readwrite", st => st.put(pack, id === "file" ? "current" : id));
+export const loadPack = id => tx("readonly", st => st.get(id === "file" ? "current" : id)).catch(() => null);
+export const clearPack = id => tx("readwrite", st => st.delete(id === "file" ? "current" : id));

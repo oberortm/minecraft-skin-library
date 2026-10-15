@@ -3,7 +3,7 @@ import { t, applyI18n } from "./i18n.js";
 
 import { $ } from "./dom.js";
 import { load3d } from "./view3d.js";
-import { readPack, packCanvases, savePack, loadPack, clearPack } from "./pack.js";
+import { readPack, packCanvases, savePack, loadPack, SOURCES, downloadSource, selectedSource, selectSource } from "./pack.js";
 const KEY = "skin-library-present";
 const QUALITY_KEY = "skin-library-mc-quality";
 const savedQuality = () => { try { const q = localStorage.getItem(QUALITY_KEY); return q === "high" || q === "low" ? q : null; } catch (e) { return null; } };
@@ -135,36 +135,89 @@ function dropWorld() {
   st.world = null;
 }
 
-// ---------- resource pack ----------
+// ---------- texture source: built-in (default), Minecraft, three packs, own file ----------
 async function applySavedPack() {
-  const pack = await loadPack();
-  syncPackUi(pack);
+  const id = await selectedSource();
+  syncPackUi(id);
+  if (id === "builtin" || !st.world) return;
+  const pack = await loadPack(id);
   if (pack && st.world) st.world.setPack(await packCanvases(pack));
 }
-function syncPackUi(pack, msg, err = false) {
-  $("prPackName").textContent = pack ? pack.name : t("packOwn");
-  $("prPackClear").hidden = !pack;
+function setHint(text, err = false, link = null) {
   const hint = $("prPackHint");
-  hint.textContent = msg || t("packHint");
+  hint.textContent = "";
+  if (link) {
+    const [a, b] = text.split("{link}");
+    const el = document.createElement("a"); el.href = link; el.target = "_blank"; el.rel = "noopener"; el.textContent = link.replace(/^https:\/\/(www\.)?/, "");
+    hint.append(a, el, b || "");
+  } else hint.textContent = text;
   hint.classList.toggle("err", err);
 }
+async function syncPackUi(id, pack) {
+  $("prTexSource").value = id;
+  $("prPackFileRow").hidden = id !== "file";
+  if (id === "file") {
+    pack = pack || await loadPack("file");
+    $("prPackName").textContent = pack ? pack.name : "";
+  }
+  setHint(id === "builtin" ? t("texBuiltinHint") : id === "file" ? t("packHint") : id === "vanilla" ? t("texVanillaHint") : t("texDownloadHint"));
+}
+function progress(p) {
+  $("prPackProgress").hidden = p === null;
+  if (p === null) return;
+  $("prPackBar").value = p < 0 ? undefined : p;
+  if (p < 0) $("prPackBar").removeAttribute("value");
+  $("prPackPct").textContent = p < 0 ? "…" : Math.round(p * 100) + " %";
+}
+async function chooseSource(id) {
+  st.packSeq = (st.packSeq || 0) + 1;
+  const prev = await selectedSource();
+  if (id === "builtin") {
+    selectSource("builtin"); if (st.world) st.world.setPack(null); syncPackUi("builtin"); return;
+  }
+  let pack = await loadPack(id);
+  if (!pack) {
+    $("prTexSource").disabled = true;
+    progress(0);
+    try {
+      pack = await downloadSource(id, progress);
+      await savePack(id, pack);
+    } catch (e) {
+      progress(null); $("prTexSource").disabled = false;
+      syncPackUi(prev);
+      setHint(t("texFailed"), true, SOURCES.find(s => s.id === id).page);
+      return;
+    }
+    progress(null); $("prTexSource").disabled = false;
+  }
+  selectSource(id);
+  if (st.world) st.world.setPack(await packCanvases(pack));
+  syncPackUi(id);
+  setHint(t("texLoaded", { name: pack.name }));
+}
 async function choosePack(file) {
-  syncPackUi(null, t("packLoading"));
+  st.packSeq = (st.packSeq || 0) + 1;
+  setHint(t("packLoading"));
   try {
     const pack = await readPack(file);
-    await savePack(pack);
+    await savePack("file", pack);
+    selectSource("file");
     if (st.world) st.world.setPack(await packCanvases(pack));
-    syncPackUi(pack);
+    syncPackUi("file", pack);
   } catch (e) {
     // a wrong or empty file is a normal user mistake: explain it in the panel, no console noise
-    const saved = await loadPack();
-    syncPackUi(saved, t(e && e.message === "unsupported" ? "packUnsupported" : "packError"), true);
+    syncPackUi(await selectedSource());
+    setHint(t(e && e.message === "unsupported" ? "packUnsupported" : "packError"), true);
   }
 }
 function togglePanel(open = $("prWorldPanel").hidden) {
   $("prWorldPanel").hidden = !open;
   $("prWorld").setAttribute("aria-expanded", String(open));
-  if (open) { loadPack().then(p => syncPackUi(p)); syncQualityUi(); }
+  if (open) {
+    const seq = st.packSeq = (st.packSeq || 0) + 1;
+    selectedSource().then(id => { if (seq === st.packSeq) syncPackUi(id); });  // ignore if the user chose meanwhile
+    syncQualityUi();
+  }
 }
 function syncQualityUi() {
   const q = st.world ? st.world.quality : savedQuality();
@@ -439,10 +492,10 @@ export function setupPresentation() {
   $("prQuality").addEventListener("click", e => { const b = e.target.closest("button[data-q]"); if (b) setQuality(b.dataset.q); });
   $("prPackPick").addEventListener("click", () => $("prPackInput").click());
   $("prPackInput").addEventListener("change", e => { const f = e.target.files[0]; e.target.value = ""; if (f) choosePack(f); });
-  $("prPackClear").addEventListener("click", async () => {
-    await clearPack().catch(() => {});
-    if (st.world) st.world.setPack(null);
-    syncPackUi(null);
+  $("prTexSource").addEventListener("change", e => {
+    // the file picker must open right inside the user's action, before anything asynchronous
+    if (e.target.value === "file") { $("prPackInput").click(); syncPackUi("file"); return; }
+    chooseSource(e.target.value);
   });
   document.addEventListener("pointerdown", e => {
     if (!$("prWorldPanel").hidden && !e.target.closest("#prWorldPanel, #prWorld")) togglePanel(false);

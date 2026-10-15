@@ -193,6 +193,11 @@ body.hdr-open .pr-menu { background: var(--pr-ui-on); color: var(--pr-ui-on-fg);
 .pr-panel-row { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
 .pr-panel-label { font: 500 13px var(--f-body); color: var(--pr-muted); }
 .pr-pack-name { font: 600 13px var(--f-body); overflow-wrap: anywhere; }
+.pr-select { flex: 1; min-width: 0; font: 600 13px var(--f-body); color: var(--pr-fg); background: var(--pr-ui); border: 1px solid var(--pr-ui-line); border-radius: 999px; padding: 6px 10px; }
+.pr-select option { color: #111; background: #fff; }
+.pr-progress { display: flex; gap: 8px; align-items: center; font: 600 12px var(--f-body); font-variant-numeric: tabular-nums; }
+.pr-progress progress { flex: 1; height: 6px; accent-color: var(--pr-ui-on); }
+.pr-panel-hint a { color: inherit; }
 .pr-panel-hint { margin: 0; font: 400 12px/1.45 var(--f-body); color: var(--pr-muted); }
 .pr-panel-hint.err { color: #ff8f7a; }
 .present.idle .pr-panel:not([hidden]) { opacity: 1; }
