@@ -8,7 +8,7 @@ const SKIN = 64;
 export class Paint3D {
   constructor({ sv, THREE }) {
     this.THREE = THREE;
-    this.viewer = new sv.SkinViewer({ width: 300, height: 300, zoom: 0.9 });
+    this.viewer = new sv.SkinViewer({ width: 300, height: 300, zoom: 0.9, pixelRatio: Math.min(2, window.devicePixelRatio || 1) });
     this.canvas = this.viewer.canvas;
     this.view = document.createElement("canvas");
     this.view.width = this.view.height = SKIN * TS;

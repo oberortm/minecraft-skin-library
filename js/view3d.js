@@ -4,6 +4,9 @@
 // If loading fails (very old browser, blocked file), only the 3D parts fall back; the rest keeps working.
 let pending = null;
 
+/** Render at most 2 device pixels per CSS pixel: phones with 3x screens look the same but draw far fewer pixels. */
+export const pixelRatio = () => Math.min(2, window.devicePixelRatio || 1);
+
 export function load3d() {
   if (!pending) {
     pending = Promise.all([import("skinview3d"), import("three")])

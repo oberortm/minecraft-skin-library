@@ -6,7 +6,7 @@ import { startPresentation, stopPresentation, presenting, setupPresentation } fr
 import { buildFigure } from "./fig3d.js";
 import { reveal, bindTilt, trackScroll, splitTitle } from "./motion.js";
 import { $, on, safe, setErrorReporter } from "./dom.js";
-import { load3d } from "./view3d.js";
+import { load3d, pixelRatio } from "./view3d.js";
 
 // filters: slim/classic are "either", fav narrows to favourites; none active = all
 const state = { skins: [], view: "front", filters: { slim: false, classic: false, fav: false }, sort: "new", search: "", current: null };
@@ -112,6 +112,24 @@ async function drawThumb(canvas, skin) {
   }
 }
 
+// CSS 3D figures are ~80 elements each: keep them per skin version instead of rebuilding on every render
+const figCache = new Map();
+function cachedFigure(skin) {
+  const key = `${skin.id}:${skin.updated}:${skin.model}:${skin.data.length}`;
+  if (!figCache.has(key)) figCache.set(key, buildFigure(skin));
+  return figCache.get(key);
+}
+function pruneFigures() {
+  const keep = new Set(state.skins.map(s => `${s.id}:${s.updated}:${s.model}:${s.data.length}`));
+  for (const k of figCache.keys()) if (!keep.has(k)) figCache.delete(k);
+}
+let gridFrame = 0;
+/** Several changes in one frame (typing fast) render the grid once. */
+function renderGridSoon() {
+  if (gridFrame) return;
+  gridFrame = requestAnimationFrame(() => { gridFrame = 0; renderGrid(); });
+}
+
 function renderGrid() {
   const grid = $("grid");
   const list = visibleSkins();
@@ -137,7 +155,7 @@ function renderGrid() {
     if (is3d) {
       const stage = b.querySelector(".stage");
       stage.dataset.side = state.view;
-      buildFigure(skin).then(fig => stage.appendChild(fig));
+      cachedFigure(skin).then(fig => { if (b.isConnected || !fig.parentNode) stage.appendChild(fig); });
       bindTilt(b);
     } else {
       drawThumb(b.querySelector("canvas"), skin);
@@ -146,6 +164,7 @@ function renderGrid() {
     return b;
   });
   grid.replaceChildren(...cards);
+  pruneFigures();
   reveal(cards);
 }
 
@@ -247,7 +266,7 @@ async function initViewer() {
   if (!kit || viewer) return viewer;
   try {
     sv = kit.sv;
-    viewer = new sv.SkinViewer({ width: 300, height: 400 });
+    viewer = new sv.SkinViewer({ width: 300, height: 400, pixelRatio: pixelRatio() });
     $("dView3d").appendChild(viewer.canvas);
     viewer.autoRotate = true; viewer.autoRotateSpeed = 0.8; viewer.zoom = 0.85;
     // only draw while the detail sheet is open
@@ -474,7 +493,7 @@ async function boot() {
     setupFilters();
     $("sortSelect").value = state.sort;
     on("sortSelect", "change", e => { state.sort = e.target.value; saveUi(); renderGrid(); });
-    on("searchInput", "input", e => { state.search = e.target.value; renderGrid(); });
+    on("searchInput", "input", e => { state.search = e.target.value; renderGridSoon(); });
   });
   safe("theme", () => {
     syncThemeBtn();

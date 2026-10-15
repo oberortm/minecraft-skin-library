@@ -2,7 +2,7 @@
 import { t, applyI18n } from "./i18n.js";
 
 import { $ } from "./dom.js";
-import { load3d } from "./view3d.js";
+import { load3d, pixelRatio } from "./view3d.js";
 import { loadEquipment, saveEquipment, applyElytra, applyArmor, ARMOR_SLOTS, ARMOR_MATS, TRIM_PATTERNS, TRIM_MATS, applyItems, ITEMS, TOOL_MATS } from "./equipment.js";
 import { readPack, packCanvases, savePack, loadPack, SOURCES, downloadSource, selectedSource, selectSource } from "./pack.js";
 const KEY = "skin-library-present";
@@ -57,7 +57,7 @@ async function initViewer() {
   if (!kit || st.viewer) return st.viewer;
   try {
     st.sv = kit.sv;
-    const v = new kit.sv.SkinViewer({ width: 600, height: 800 });
+    const v = new kit.sv.SkinViewer({ width: 600, height: 800, pixelRatio: pixelRatio() });
     $("prStage").appendChild(v.canvas);
     v.zoom = 0.66;
     v.fov = 38;
