@@ -126,11 +126,6 @@ const TEX = {
     const ring = d > 5.5 ? 0.62 : d > 3.5 ? 1.05 : 0.85;
     return shade(hex("#86e8dc"), ring * (0.88 + r() * 0.16));
   }),
-  lantern: s => paint(s, (x, y, r) => {
-    const d = Math.max(Math.abs(x - 7.5), Math.abs(y - 7.5));
-    if (d > 5.5) return shade(hex("#3b342e"), 0.8 + r() * 0.3);
-    return shade(hex("#ffcf7a"), 0.85 + r() * 0.2);
-  }),
 };
 
 /** Block types: per-face textures in BoxGeometry order (+x, -x, +y, -y, +z, -z). */
@@ -255,14 +250,16 @@ const LOOKS = {
     sky: { top: "#3a5a92", horizon: "#ffb27a", bottom: "#c88a6a", sun: sunAt(SUNRISE_AZ, 0.09), sunColor: "#ffc896", sunSize: 0.03, glow: 0.9 },
     fog: ["#f2b48a", 180, 760], hemi: ["#a8c4ff", "#7a5236", 0.72],
     key: { dir: sunAt(SUNRISE_AZ, 0.2), color: "#ffb36b", intensity: 2.4 }, fill: 0.3,
-    bloom: [0.4, 0.55, 0.85], player: [0.2, 0.45], rays: true, faceSun: true,
+    bloom: [0.4, 0.55, 0.85], player: [0.2, 0.45], rays: true, face: SUNRISE_AZ,
   },
   "mc-night": {
     set: "land", exposure: 1.35,
-    sky: { top: "#03060f", horizon: "#13213d", bottom: "#070b14", sun: sunAt(0.9, 0.62), sunColor: "#dfe8ff", sunSize: 0.038, glow: 0.45, stars: 1, moon: 1 },
-    fog: ["#0f1a30", 160, 640], hemi: ["#4a64a8", "#120e0c", 0.45],
-    key: { dir: sunAt(0.9, 0.7), color: "#9fb8ff", intensity: 0.85 }, fill: 0.1,
-    bloom: [0.9, 0.6, 0.55], player: [0.12, 0.18], lanterns: true, fireflies: true,
+    // only moon and starlight: a cool key light from the moon, a faint blue sky light, no lamps
+    sky: { top: "#040814", horizon: "#16264a", bottom: "#070b14", sun: sunAt(0.75, 0.3), sunColor: "#e4ecff", sunSize: 0.036, glow: 0.3, stars: 1.3, moon: 1 },
+    fog: ["#101c34", 170, 700], hemi: ["#5470b8", "#0e0d10", 0.55],
+    // the moon stands behind the starting camera and lights the figure's front; turn around to see it
+    key: { dir: sunAt(0.75, 0.38), color: "#b4c8ff", intensity: 1.15 }, fill: 0.15, fillColor: "#c8d6ff",
+    bloom: [0.5, 0.6, 0.8], player: [0.12, 0.25],
   },
 };
 
@@ -522,43 +519,6 @@ export class McWorld {
     return g;
   }
 
-  /** Lanterns on posts around the clearing, each a warm point light with a glow. */
-  buildLanterns() {
-    const g = new THREE.Group(), glow = this.glowTex();
-    const post = this.material("logSide", "log"), lamp = new THREE.MeshStandardMaterial({ map: this.texture("lantern"), emissive: new THREE.Color("#ffb347"), emissiveMap: this.texture("lantern"), emissiveIntensity: 3 });
-    const postGeo = new THREE.BoxGeometry(4, B * 1.5, 4), lampGeo = new THREE.BoxGeometry(7, 9, 7);
-    this.disposables.push(lamp, postGeo, lampGeo);
-    const spots = this.quality === "high" ? [[5, 3], [-5, 2.5], [1, -5.5], [-3.5, -4.5]] : [[5, 3], [-5, 2.5], [1, -5.5]];
-    for (const [x, z] of spots) {
-      const p = new THREE.Mesh(postGeo, post); p.position.set(x * B, FEET + B * 0.75, z * B); p.castShadow = true;
-      const l = new THREE.Mesh(lampGeo, lamp); l.position.set(x * B, FEET + B * 1.5 + 4.5, z * B);
-      const light = new THREE.PointLight("#ffb05a", 2.2, 230, 2); light.position.copy(l.position);
-      const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow, color: "#ffb35c", blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.85, fog: false }));
-      s.position.copy(l.position); s.scale.set(26, 26, 1);
-      this.disposables.push(s.material);
-      g.add(p, l, light, s);
-    }
-    return g;
-  }
-
-  /** Fireflies drifting over the meadow at night. */
-  buildFireflies() {
-    const N = this.quality === "high" ? 70 : 36, r = rng(17);
-    const pos = new Float32Array(N * 3);
-    this.flyBase = [];
-    for (let i = 0; i < N; i++) {
-      const a = r() * Math.PI * 2, d = 50 + r() * 170;
-      const p = [Math.cos(a) * d, FEET + 8 + r() * 40, Math.sin(a) * d];
-      this.flyBase.push([...p, r() * 10]);
-      pos.set(p, i * 3);
-    }
-    const geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-    const mat = new THREE.PointsMaterial({ color: "#d8ff8a", size: 3.2, map: this.glowTex(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
-    this.disposables.push(geo, mat);
-    this.flies = new THREE.Points(geo, mat);
-    return this.flies;
-  }
-
   /** A visible cone of light from above plus dust floating in it. */
   buildBeam() {
     const g = new THREE.Group();
@@ -612,7 +572,7 @@ export class McWorld {
   set(name) {
     if (!this.sets[name]) {
       const g = name === "roomWhite" ? this.buildRoom(true) : name === "roomDark" ? this.buildRoom(false) : name === "land" ? this.buildLand()
-        : name === "lanterns" ? this.buildLanterns() : name === "fireflies" ? this.buildFireflies() : name === "beam" ? this.buildBeam() : null;
+        : name === "beam" ? this.buildBeam() : null;
       g.visible = false;
       this.root.add(g);
       this.sets[name] = g;
@@ -627,16 +587,14 @@ export class McWorld {
     const v = this.viewer, r = v.renderer;
     for (const g of Object.values(this.sets)) g.visible = false;
     this.set(look.set).visible = true;
-    if (look.faceSun) {
+    if (look.face !== undefined) {
       // start with the sun in view, a little beside the figure
       const v0 = this.viewer, dist = v0.camera.position.distanceTo(v0.controls.target);
       const cam = v0.camera, halfW = Math.atan(Math.tan(cam.fov * Math.PI / 360) * cam.aspect);
-      const a = SUNRISE_AZ + Math.PI + Math.min(0.3, halfW * 0.45);
+      const a = look.face + Math.PI + Math.min(0.3, halfW * 0.45);
       v0.camera.position.set(Math.sin(a), 0.16, Math.cos(a)).normalize().multiplyScalar(dist).add(v0.controls.target);
       v0.controls.update();
     }
-    if (look.lanterns) this.set("lanterns").visible = true;
-    if (look.fireflies) this.set("fireflies").visible = true;
     if (look.spot) this.set("beam").visible = true;
     r.toneMappingExposure = look.exposure;
     const u = this.sky.material.uniforms, s = look.sky;
@@ -674,7 +632,7 @@ export class McWorld {
     r.shadowMap.needsUpdate = true;
   }
 
-  /** Per-frame motion (dust, fireflies, stars, rays) and the automatic quality fallback. */
+  /** Per-frame motion (dust, stars, rays) and the automatic quality fallback. */
   tick() {
     const dt = Math.min(0.1, this.clock.getDelta());
     const t = this.clock.elapsedTime;
@@ -686,12 +644,6 @@ export class McWorld {
         const a = this.dustPoints.geometry.attributes.position;
         this.dust.forEach(([x, y, z, p], i) => a.setXYZ(i, x + Math.sin(t * 0.3 + p) * 4, y + Math.sin(t * 0.17 + p * 2) * 6, z + Math.cos(t * 0.25 + p) * 4));
         a.needsUpdate = true;
-      }
-      if (this.flies && this.flies.visible) {
-        const a = this.flies.geometry.attributes.position;
-        this.flyBase.forEach(([x, y, z, p], i) => a.setXYZ(i, x + Math.sin(t * 0.4 + p) * 14, y + Math.sin(t * 0.9 + p * 3) * 5, z + Math.cos(t * 0.35 + p) * 14));
-        a.needsUpdate = true;
-        this.flies.material.opacity = 0.7 + 0.3 * Math.sin(t * 2.1);
       }
     }
     // drop to the cheap path if the device cannot keep up (checked once, after the first seconds)
