@@ -351,7 +351,7 @@ function raysTexture() {
 }
 
 // ---------- scene looks ----------
-const SUNRISE_AZ = -2.7; // the island stays low towards the rising sun so it is never hidden behind hills
+const LIGHT_AZ = -2.7; // where the sun rises and the moon stands; the island stays low that way
 const sunAt = (azimuth, elevation) => new THREE.Vector3(
   Math.cos(elevation) * Math.sin(azimuth), Math.sin(elevation), Math.cos(elevation) * Math.cos(azimuth));
 
@@ -374,19 +374,19 @@ const LOOKS = {
   },
   "mc-sunrise": {
     set: "land", exposure: 1.0,
-    sky: { top: "#3a5a92", horizon: "#ffb27a", bottom: "#c88a6a", sun: sunAt(SUNRISE_AZ, 0.09), sunColor: "#ffc896", sunSize: 0.03, glow: 0.9 },
+    sky: { top: "#3a5a92", horizon: "#ffb27a", bottom: "#c88a6a", sun: sunAt(LIGHT_AZ, 0.09), sunColor: "#ffc896", sunSize: 0.03, glow: 0.9 },
     fog: ["#f2b48a", 180, 760], hemi: ["#a8c4ff", "#7a5236", 0.72],
-    key: { dir: sunAt(SUNRISE_AZ, 0.2), color: "#ffb36b", intensity: 2.4 }, fill: 0.3,
-    bloom: [0.4, 0.55, 0.85], player: [0.2, 0.45], rays: { color: "#ffc994", strength: 0.6, sprite: true }, face: SUNRISE_AZ, water: ["#2a5a8c", 1, 2.0],
+    key: { dir: sunAt(LIGHT_AZ, 0.2), color: "#ffb36b", intensity: 2.4 }, fill: 0.3,
+    bloom: [0.4, 0.55, 0.85], player: [0.2, 0.45], rays: { color: "#ffc994", strength: 0.6, sprite: true }, face: LIGHT_AZ, water: ["#2a5a8c", 1, 2.0],
   },
   "mc-night": {
     set: "land", exposure: 1.35,
     // only moon and starlight: a cool key light from the moon, a faint blue sky light, no lamps
-    sky: { top: "#040814", horizon: "#16264a", bottom: "#070b14", sun: sunAt(0.75, 0.3), sunColor: "#e4ecff", sunSize: 0.036, glow: 0.3, stars: 1.3, moon: 1 },
+    sky: { top: "#040814", horizon: "#16264a", bottom: "#070b14", sun: sunAt(LIGHT_AZ, 0.13), sunColor: "#e4ecff", sunSize: 0.036, glow: 0.3, stars: 1.3, moon: 1 },
     fog: ["#101c34", 170, 700], hemi: ["#5470b8", "#0e0d10", 0.55],
-    // the moon stands behind the starting camera and lights the figure's front; turn around to see it
-    key: { dir: sunAt(0.75, 0.38), color: "#b4c8ff", intensity: 1.15 }, fill: 0.15, fillColor: "#c8d6ff",
-    bloom: [0.5, 0.6, 0.8], player: [0.12, 0.25], rays: { color: "#9fb6ff", strength: 0.2 }, water: ["#0c1c36", 0.3, 0.45],
+    // the moon stands where the sun rises: diagonally left behind the figure, mirrored in the lake
+    key: { dir: sunAt(LIGHT_AZ, 0.32), color: "#b4c8ff", intensity: 1.15 }, fill: 0.4, fillColor: "#c8d6ff",
+    bloom: [0.5, 0.6, 0.8], player: [0.15, 0.35], rays: { color: "#9fb6ff", strength: 0.2 }, water: ["#0c1c36", 0.3, 0.45], face: LIGHT_AZ,
   },
 };
 
@@ -462,6 +462,25 @@ export class McWorld {
     this.fillLight.position.set(0, 0.3, 1);
     v.camera.add(this.fillLight);
     v.scene.onBeforeRender = () => this.tick();
+    // camera collision: the controls keep the distance you chose; if blocks are between the figure and
+    // the camera, the camera is drawn in front of them for that frame instead of ending up inside a hill
+    const ctl = v.controls, update = ctl.update.bind(ctl);
+    const ray = new THREE.Raycaster(), dir = new THREE.Vector3();
+    this.restoreControls = () => { ctl.update = update; };
+    ctl.update = () => {
+      const cam = v.camera, tgt = ctl.target;
+      if (this.wantDist) cam.position.sub(tgt).setLength(this.wantDist).add(tgt);
+      const out = update();
+      this.wantDist = cam.position.distanceTo(tgt);
+      const land = this.sets.land;
+      if (land && land.visible && this.landMeshes) {
+        dir.subVectors(cam.position, tgt).normalize();
+        ray.set(tgt, dir); ray.far = this.wantDist;
+        const hit = ray.intersectObjects(this.landMeshes, false)[0];
+        if (hit) cam.position.copy(tgt).addScaledVector(dir, Math.max(ctl.minDistance * 0.6, hit.distance - 6));
+      }
+      return out;
+    };
   }
 
   setTargetType(type) {
@@ -677,55 +696,65 @@ export class McWorld {
 
   /** A small island: grass, dirt, stone, sand at the shore, trees beyond the camera's circle, water around. */
   buildLand() {
-    const cells = [], n = valueNoise(3), r = rng(5), R = 16;
+    // a bigger island: free clearing around the figure, hills further out, a lake towards the
+    // sun/moon (so its reflection shows), three trees, a few boulders
+    const cells = [], n = valueNoise(3), r = rng(5), R = 30;
+    const ang = (x, z) => Math.abs(Math.atan2(Math.sin(Math.atan2(x, z) - LIGHT_AZ), Math.cos(Math.atan2(x, z) - LIGHT_AZ)));
+    const lake = [Math.sin(LIGHT_AZ) * 14, Math.cos(LIGHT_AZ) * 14];
     const height = (x, z) => {
       const d = Math.hypot(x, z);
-      if (d <= 5.5) return 0;
-      const shore = Math.max(0, (d - (R - 4.5)) / 4.5);
-      const ramp = Math.min(1, (d - 5.5) / 4);
-      const towardsSun = Math.abs(Math.atan2(Math.sin(Math.atan2(x, z) - SUNRISE_AZ), Math.cos(Math.atan2(x, z) - SUNRISE_AZ))) < 0.75;
-      const hills = ((n(x / 5, z / 5) - 0.4) * 2.6 + (d > 9 ? (d - 9) * 0.22 : 0)) * ramp * (towardsSun ? 0.15 : 1);
-      return Math.round(Math.max(-1, Math.min(4, hills * Math.max(0, 1 - shore) - shore * 2.4)));
+      const dl = Math.hypot(x - lake[0], z - lake[1]) - n(x / 3, z / 3) * 1.6;
+      if (dl < 5.2) return -2;
+      if (d <= 7) return 0;
+      const ramp = Math.min(1, (d - 7) / 6);
+      let h = ((n(x / 6, z / 6) - 0.32) * 5 + (d > 13 ? (d - 13) * 0.38 : 0)) * ramp;
+      if (ang(x, z) < 0.6) h *= 0.25;                       // keep the view to the light open
+      if (dl < 9) h *= Math.max(0, (dl - 5.2) / 3.8);        // soft lake shore
+      const shore = Math.max(0, (d - (R - 4)) / 4);
+      return Math.round(Math.max(-1, Math.min(7, h * (1 - shore) - shore * 2)));
     };
     const tops = new Map();
     for (let x = -R; x <= R; x++) for (let z = -R; z <= R; z++) {
       if (Math.hypot(x, z) > R + 0.5) continue;
       const h = height(x, z);
       tops.set(x + "," + z, h);
-      const shoreSand = h <= 0 && Math.hypot(x, z) > R - 5;
+      const sandy = h <= 0 && (Math.hypot(x, z) > R - 4 || Math.hypot(x - lake[0], z - lake[1]) < 7.5);
       for (let y = Math.min(h, -1) - 2; y <= h; y++) {
-        let type = y === h ? (shoreSand ? "sand" : "grass") : y >= h - 2 ? (shoreSand ? "sand" : "dirt") : "stone";
-        if (y === h && h >= 3 && n(x / 2, z / 2 + 9) > 0.55) type = "stone";
+        let type = y === h ? (sandy ? "sand" : "grass") : y >= h - 2 ? (sandy ? "sand" : "dirt") : "stone";
+        if (y === h && h >= 4 && n(x / 2, z / 2 + 9) > 0.5) type = "stone";
         cells.push([type, x, y, z]);
       }
     }
-    // trees outside the camera's orbit so they never block the view of the figure
-    const spots = [[11, 3], [-10, 8], [6, -12], [-12, -5], [3, 13], [-5, -12], [13, -6], [-13, 2]];
-    for (const [x, z] of spots) {
-      if (Math.abs(Math.atan2(Math.sin(Math.atan2(x, z) - SUNRISE_AZ), Math.cos(Math.atan2(x, z) - SUNRISE_AZ))) < 0.75) continue;
+    // three trees, away from the lake and the clearing
+    for (const [a, d] of [[LIGHT_AZ + 1.9, 14], [LIGHT_AZ + 2.9, 15], [LIGHT_AZ - 2.2, 14]]) {
+      const x = Math.round(Math.sin(a) * d), z = Math.round(Math.cos(a) * d);
       const h = tops.get(x + "," + z);
       if (h === undefined || h < 0) continue;
-      const trunk = 4 + Math.floor(r() * 2);
+      const trunk = 5 + Math.floor(r() * 2);
       for (let y = 1; y <= trunk; y++) cells.push(["log", x, h + y, z]);
-      for (let dy = trunk - 1; dy <= trunk + 2; dy++) {
-        const rad = dy >= trunk + 1 ? 1 : 2;
+      for (let dy = trunk - 2; dy <= trunk + 1; dy++) {
+        const rad = dy >= trunk ? 1 : 2;
         for (let dx = -rad; dx <= rad; dx++) for (let dz = -rad; dz <= rad; dz++) {
-          if (dx === 0 && dz === 0 && dy < trunk + 1) continue;
+          if (dx === 0 && dz === 0 && dy < trunk) continue;
           if (Math.abs(dx) === rad && Math.abs(dz) === rad && r() < 0.6) continue;
           cells.push(["leaves", x + dx, h + dy, z + dz]);
         }
       }
     }
-    // a few stones scattered near the clearing
-    for (const [x, z] of [[5, 4], [-6, 3], [4, -6]]) cells.push(["stone", x, (tops.get(x + "," + z) ?? 0) + 1, z]);
+    // a few boulders at the edge of the clearing
+    for (const [a, d] of [[LIGHT_AZ + 1.2, 8], [LIGHT_AZ - 1.4, 8.5], [LIGHT_AZ + 3.4, 9]]) {
+      const x = Math.round(Math.sin(a) * d), z = Math.round(Math.cos(a) * d), h = tops.get(x + "," + z) ?? 0;
+      cells.push(["stone", x, h + 1, z], ["stone", x + 1, h + 1, z], ["stone", x, h + 2, z]);
+    }
     const g = this.buildBlocks(dedupe(cells), 21);
+    this.landMeshes = g.children.filter(o => o.isInstancedMesh);
     // water: one big plane, fades into the fog
     const wt = this.makeTexture("water");
     wt.wrapS = wt.wrapT = THREE.RepeatWrapping; wt.repeat.set(140, 140); wt.minFilter = THREE.NearestFilter;
     const water = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000),
       new THREE.MeshStandardMaterial({ map: wt, roughness: 0.12, metalness: 0.1, transparent: true, opacity: 0.88 }));
     water.rotation.x = -Math.PI / 2;
-    water.position.y = FEET - B - 2;
+    water.position.y = FEET - 3; // just below the grass, so the lake is full
     water.receiveShadow = true;
     g.add(water);
     this.water = water;
@@ -909,7 +938,8 @@ export class McWorld {
       // start with the sun in view, a little beside the figure
       const v0 = this.viewer, dist = v0.camera.position.distanceTo(v0.controls.target);
       const cam = v0.camera, halfW = Math.atan(Math.tan(cam.fov * Math.PI / 360) * cam.aspect);
-      const a = look.face + Math.PI + Math.min(0.3, halfW * 0.45);
+      // the light sits diagonally left behind the figure
+      const a = look.face + Math.PI - Math.min(0.3, halfW * 0.45);
       v0.camera.position.set(Math.sin(a), 0.16, Math.cos(a)).normalize().multiplyScalar(dist).add(v0.controls.target);
       v0.controls.update();
     }
@@ -1021,6 +1051,7 @@ export class McWorld {
   dispose() {
     const v = this.viewer, r = v.renderer, s = this.saved;
     v.scene.onBeforeRender = () => {};
+    if (this.restoreControls) this.restoreControls();
     v.scene.remove(this.root);
     v.camera.remove(this.fillLight);
     v.scene.fog = null;
