@@ -214,6 +214,7 @@ h3 { margin: 0; font: 500 11px var(--f-mono); text-transform: uppercase; letter-
 .toolset { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
 .tool-opt { display: grid; grid-template-columns: auto minmax(0, 1fr) 3.2em; gap: 8px; align-items: center; font-size: 13px; color: var(--muted); }
 .tool-opt input[type=range] { accent-color: var(--accent); min-width: 0; }
+.color-row .swap { flex: none; padding: 7px; }
 .tool-opt output { font-variant-numeric: tabular-nums; text-align: right; color: var(--fg); }
 .tool { position: relative; aspect-ratio: 1; display: grid; place-items: center; border: 1px solid var(--line); background: var(--surface); border-radius: 8px; cursor: pointer; }
 .tool[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }

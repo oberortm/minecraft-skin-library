@@ -15,7 +15,7 @@ const ed = {
   open: false, skin: null, onSave: null,
   tex: null, ctx: null,
   model: "classic", layer: "base", tool: "pencil", color: "#3b6fe0",
-  show: { base: true, outer: true }, mirror: false, noise: 0.25, mode: "3d", space: false,
+  show: { base: true, outer: true }, mirror: false, noise: 0.25, color2: "#0f2a5c", mode: "3d", space: false,
   undo: [], redo: [], dirty: false,
   stroke: null, hover: null, hover3d: null, p3d: null, p3dFailed: false, frame: 0,
 };
@@ -72,6 +72,58 @@ function flood(x, y, rgba) {
     stack.push([px + 1, py], [px - 1, py], [px, py + 1], [px, py - 1]);
   }
   ed.ctx.putImageData(img, fx, fy);
+}
+
+/** The pixels a fill would change: same colour, connected, inside one face. */
+function regionAt(x, y) {
+  const face = faceAt(aw(), x, y);
+  if (!face) return null;
+  const [fx, fy, fw, fh] = face.rect;
+  const d = ed.ctx.getImageData(fx, fy, fw, fh).data;
+  const idx = (px, py) => ((py - fy) * fw + (px - fx)) * 4;
+  const s0 = idx(x, y), seen = new Set(), out = [];
+  const same = i => d[i] === d[s0] && d[i + 1] === d[s0 + 1] && d[i + 2] === d[s0 + 2] && d[i + 3] === d[s0 + 3];
+  const stack = [[x, y]];
+  while (stack.length) {
+    const [px, py] = stack.pop();
+    if (px < fx || py < fy || px >= fx + fw || py >= fy + fh) continue;
+    const k = px + py * 64;
+    if (seen.has(k) || !same(idx(px, py))) continue;
+    seen.add(k); out.push([px, py]);
+    stack.push([px + 1, py], [px - 1, py], [px, py + 1], [px, py - 1]);
+  }
+  return { rect: face.rect, pixels: out };
+}
+
+// ---------- gradient: drag from A (colour 1) towards B (colour 2) over the region under A ----------
+function startGradient(x, y, canvas, extra = {}) {
+  const r = regionAt(x, y);
+  if (!r) return;
+  snapshot();
+  ed.stroke = { grad: { a: [x, y], rect: r.rect, pixels: r.pixels, base: ed.ctx.getImageData(0, 0, 64, 64) }, canvas, ...extra };
+  updateGradient(x, y);
+  ed.dirty = true;
+}
+function updateGradient(x, y) {
+  const g = ed.stroke.grad, [fx, fy, fw, fh] = g.rect;
+  // a point outside the face still gives a direction: clamp it onto the face
+  const bx = Math.min(fx + fw - 1, Math.max(fx, x)), by = Math.min(fy + fh - 1, Math.max(fy, y));
+  const [ax, ay] = g.a, dx = bx - ax, dy = by - ay, len2 = dx * dx + dy * dy;
+  const c1 = hexToRgba(ed.color), c2 = hexToRgba(ed.color2);
+  ed.ctx.putImageData(g.base, 0, 0);
+  const img = ed.ctx.getImageData(0, 0, 64, 64), d = img.data;
+  const put = (px, py, t) => {
+    const i = (py * 64 + px) * 4;
+    for (let k = 0; k < 3; k++) d[i + k] = Math.round(c1[k] + (c2[k] - c1[k]) * t);
+    d[i + 3] = 255;
+  };
+  for (const [px, py] of g.pixels) {
+    const t = len2 ? Math.min(1, Math.max(0, ((px - ax) * dx + (py - ay) * dy) / len2)) : 0;
+    put(px, py, t);
+    if (ed.mirror) { const m = mirrorPixel(aw(), px, py); if (m) put(m[0], m[1], t); }
+  }
+  ed.ctx.putImageData(img, 0, 0);
+  redraw();
 }
 
 function snapshot() {
@@ -197,6 +249,12 @@ function texPoint(e) {
   const x = Math.floor((e.clientX - r.left) / r.width * 64), y = Math.floor((e.clientY - r.top) / r.height * 64);
   return x >= 0 && y >= 0 && x < 64 && y < 64 ? [x, y] : null;
 }
+/** Texture point even outside the canvas (for gradient directions); null on the flat figures. */
+function unclampedTex(canvas, e) {
+  if (canvas !== $("eTex")) return null;
+  const r = canvas.getBoundingClientRect();
+  return [Math.floor((e.clientX - r.left) / r.width * 64), Math.floor((e.clientY - r.top) / r.height * 64)];
+}
 function figurePoint(canvas, side, e) {
   const r = canvas.getBoundingClientRect();
   const vx = Math.floor((e.clientX - r.left) / r.width * 16), vy = Math.floor((e.clientY - r.top) / r.height * 32);
@@ -209,12 +267,18 @@ function bindPaint(canvas, toTex) {
     const p = toTex(e);
     if (!p) return;
     canvas.setPointerCapture(e.pointerId);
+    if (ed.tool === "gradient") { startGradient(p[0], p[1], canvas); return; }
     const changed = applyAt(p[0], p[1], true);
     ed.stroke = changed && STROKE_TOOLS.has(ed.tool) ? { last: p, canvas } : null;
     if (changed) { ed.dirty = true; redraw(); }
   });
   canvas.addEventListener("pointermove", e => {
     if (canvas === $("eTex")) { ed.hover = texPoint(e); }
+    if (ed.stroke && ed.stroke.canvas === canvas && ed.stroke.grad) {
+      const p = toTex(e) || unclampedTex(canvas, e);
+      if (p) updateGradient(p[0], p[1]);
+      return;
+    }
     if (ed.stroke && ed.stroke.canvas === canvas) {
       const p = toTex(e);
       if (p && (p[0] !== ed.stroke.last[0] || p[1] !== ed.stroke.last[1])) {
@@ -262,6 +326,7 @@ function bindPaint3d(canvas) {
     const h = pick3d(e);
     setHover3d(h);
     if (!h || h.blocked) return;
+    if (ed.tool === "gradient") { startGradient(h.x, h.y, canvas, { id: e.pointerId, t: performance.now() }); return; }
     const changed = applyAt(h.x, h.y, true);
     ed.stroke = changed && STROKE_TOOLS.has(ed.tool)
       ? { canvas, sx: e.clientX, sy: e.clientY, last: [h.x, h.y], t: performance.now(), id: e.pointerId } : null;
@@ -270,6 +335,12 @@ function bindPaint3d(canvas) {
   canvas.addEventListener("pointermove", e => {
     if (ed.mode !== "3d") return;
     const s = ed.stroke;
+    if (s && s.grad && s.canvas === canvas && s.id === e.pointerId) {
+      const h = pick3d(e);
+      if (h && !h.blocked) updateGradient(h.x, h.y);
+      setHover3d(h);
+      return;
+    }
     if (s && s.canvas === canvas && s.id === e.pointerId) {
       // close gaps between pointer events: walk the screen path in small steps and paint every pixel it crosses
       const dx = e.clientX - s.sx, dy = e.clientY - s.sy;
@@ -323,6 +394,7 @@ function setColor(hex) {
 function setTool(tool) {
   ed.tool = tool;
   $("eNoiseOpt").hidden = tool !== "noise";
+  $("eColor2Row").hidden = $("eGradHint").hidden = tool !== "gradient";
   document.querySelectorAll("#eTools .tool").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.tool === tool)));
   syncRotate();
 }
@@ -487,6 +559,13 @@ export function setupEditor() {
   $("eShowBase").addEventListener("change", e => setShow("base", e.target.checked));
   $("eShowOuter").addEventListener("change", e => setShow("outer", e.target.checked));
   $("eMirror").addEventListener("change", e => { ed.mirror = e.target.checked; });
+  const setColor2 = hex => { ed.color2 = hex.toLowerCase(); $("eColor2").value = ed.color2; $("eHex2").value = ed.color2; };
+  $("eColor2").addEventListener("input", e => setColor2(e.target.value));
+  $("eHex2").addEventListener("change", e => {
+    let v = e.target.value.trim(); if (!v.startsWith("#")) v = "#" + v;
+    if (/^#[0-9a-f]{6}$/i.test(v)) setColor2(v); else e.target.value = ed.color2;
+  });
+  $("eSwap").addEventListener("click", () => { const a = ed.color; setColor(ed.color2); setColor2(a); });
   const setNoise = v => { ed.noise = v / 100; $("eNoise").value = v; $("eNoiseOut").textContent = v + " %"; };
   try { const v = Number(localStorage.getItem(NOISE_KEY)); if (v >= 5 && v <= 100) setNoise(v); } catch (e) { /* ignore */ }
   $("eNoise").addEventListener("input", e => {
@@ -517,7 +596,7 @@ export function setupEditor() {
       return;
     }
     if (e.key.toLowerCase() === "m") { ed.mirror = !ed.mirror; $("eMirror").checked = ed.mirror; return; }
-    const map = { b: "pencil", e: "eraser", n: "noise", g: "fill", i: "picker", r: "rotate" };
+    const map = { b: "pencil", e: "eraser", n: "noise", g: "fill", v: "gradient", i: "picker", r: "rotate" };
     if (map[e.key.toLowerCase()]) setTool(map[e.key.toLowerCase()]);
   });
   $("editor").addEventListener("keyup", e => { if (e.key === " " && ed.space) { e.preventDefault(); ed.space = false; syncRotate(); } });
