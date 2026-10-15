@@ -679,7 +679,6 @@ export class McWorld {
     this.water = water;
     this.waterSimple = water.material;
     this.disposables.push(wt, water.geometry, water.material);
-    if (this.quality === "high") this.enableReflections();
     return g;
   }
 
@@ -841,6 +840,8 @@ export class McWorld {
       g.visible = false;
       this.root.add(g);
       this.sets[name] = g;
+      // only now: switching on reflections re-applies the look, which must find this set already built
+      if (name === "land" && this.quality === "high") this.enableReflections();
     }
     return this.sets[name];
   }
