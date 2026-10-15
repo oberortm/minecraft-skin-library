@@ -358,9 +358,11 @@ const LOOKS = {
 };
 
 export class McWorld {
-  constructor(viewer, quality = guessQuality()) {
+  /** fixed: the user chose the quality, so it is never lowered automatically. */
+  constructor(viewer, quality = guessQuality(), fixed = false) {
     this.viewer = viewer;
     this.quality = quality;
+    this.fixedQuality = fixed;
     this.root = new THREE.Group();
     this.root.name = "mc-world";
     this.sets = {};
@@ -934,25 +936,32 @@ export class McWorld {
       }
     }
     // drop to the cheap path if the device cannot keep up (checked once, after the first seconds)
-    if (this.quality === "high" && this.frames < 150) {
+    if (this.quality === "high" && !this.fixedQuality && this.frames < 150) {
       this.frames++;
       if (this.frames > 30 && dt > 0.045) this.slow++;
       if (this.frames === 150 && this.slow > 60) this.lower();
     }
   }
 
-  lower() {
-    this.quality = "low";
-    this.removeBloom();
-    this.removeRays();
-    this.disableReflections();
+  lower() { this.setQuality("low"); }
+
+  /** "high": bloom, light shafts, reflective water, big shadow maps. "low": none of these, smaller shadows. */
+  setQuality(q, fixed = this.fixedQuality) {
+    this.fixedQuality = fixed;
+    if (q === this.quality && this.qualityApplied) return;
+    this.quality = q; this.qualityApplied = true;
+    const r = this.viewer.renderer, high = q === "high";
+    if (high) { this.addBloom(); this.addRays(); this.enableReflections(); }
+    else { this.removeBloom(); this.removeRays(); this.disableReflections(); }
+    const size = high ? 2048 : 1024;
     for (const l of [this.key, this.spot]) {
-      if (!l) continue;
-      l.shadow.mapSize.set(1024, 1024);
+      if (!l || l.shadow.mapSize.x === size) continue;
+      l.shadow.mapSize.set(size, size);
       if (l.shadow.map) { l.shadow.map.dispose(); l.shadow.map = null; }
     }
-    const r = this.viewer.renderer;
-    if (r.getPixelRatio() > 1.25) { r.setPixelRatio(1.25); this.viewer.updateComposerSize(); }
+    const ratio = high ? this.saved.pixelRatio : Math.min(this.saved.pixelRatio, 1.5);
+    if (r.getPixelRatio() !== ratio) { r.setPixelRatio(ratio); this.viewer.updateComposerSize(); }
+    r.shadowMap.needsUpdate = true;
   }
 
   /** Take the world out of the scene, restore the viewer as skinview3d set it up, free GPU memory. */

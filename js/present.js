@@ -5,6 +5,8 @@ import { $ } from "./dom.js";
 import { load3d } from "./view3d.js";
 import { readPack, packCanvases, savePack, loadPack, clearPack } from "./pack.js";
 const KEY = "skin-library-present";
+const QUALITY_KEY = "skin-library-mc-quality";
+const savedQuality = () => { try { const q = localStorage.getItem(QUALITY_KEY); return q === "high" || q === "low" ? q : null; } catch (e) { return null; } };
 const reduce = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 // Two groups of four moods. Classic scenes are CSS backdrops behind the figure; Minecraft scenes
@@ -113,7 +115,8 @@ async function applyScene(id) {
     if (!st.world) {
       st.worldMod = st.worldMod || await import("./mcworld.js");
       if (token !== st.token || !st.on) return;
-      st.world = new st.worldMod.McWorld(v);
+      const q = savedQuality();
+      st.world = new st.worldMod.McWorld(v, q || st.worldMod.guessQuality(), !!q);
       applySavedPack();
     }
     st.world.setLook(id);
@@ -160,7 +163,16 @@ async function choosePack(file) {
 function togglePanel(open = $("prWorldPanel").hidden) {
   $("prWorldPanel").hidden = !open;
   $("prWorld").setAttribute("aria-expanded", String(open));
-  if (open) loadPack().then(p => syncPackUi(p));
+  if (open) { loadPack().then(p => syncPackUi(p)); syncQualityUi(); }
+}
+function syncQualityUi() {
+  const q = st.world ? st.world.quality : savedQuality();
+  document.querySelectorAll("#prQuality button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.q === q)));
+}
+function setQuality(q) {
+  try { localStorage.setItem(QUALITY_KEY, q); } catch (e) { /* ignore */ }
+  if (st.world) st.world.setQuality(q, true);
+  syncQualityUi();
 }
 
 function toggleGroup() {
@@ -374,6 +386,7 @@ export function setupPresentation() {
   root.addEventListener("pointerdown", wake, true);
   $("hdrClose").addEventListener("click", closeHeader);
   $("prWorld").addEventListener("click", () => togglePanel());
+  $("prQuality").addEventListener("click", e => { const b = e.target.closest("button[data-q]"); if (b) setQuality(b.dataset.q); });
   $("prPackPick").addEventListener("click", () => $("prPackInput").click());
   $("prPackInput").addEventListener("change", e => { const f = e.target.files[0]; e.target.value = ""; if (f) choosePack(f); });
   $("prPackClear").addEventListener("click", async () => {
