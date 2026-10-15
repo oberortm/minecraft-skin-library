@@ -216,6 +216,15 @@ h3 { margin: 0; font: 500 11px var(--f-mono); text-transform: uppercase; letter-
 .tool-opt input[type=range] { accent-color: var(--accent); min-width: 0; }
 .layer-toggles { display: flex; gap: 6px; flex-wrap: wrap; }
 .layer-toggles .chip { flex: 1; }
+/* body-part toggles laid out like the figure seen from the front (its right arm on your left) */
+.parts { display: grid; grid-template-columns: 4fr 8fr 4fr; grid-template-rows: 8fr 12fr 12fr; gap: 4px; width: 112px; aspect-ratio: 16 / 32; margin: 2px auto 4px;
+  grid-template-areas: ". head ." "rarm body larm" ". legs ."; }
+.part { border: 2px solid var(--line); background: var(--surface-2); border-radius: 3px; cursor: pointer; padding: 0; min-width: 0; min-height: 0; }
+.part[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, var(--surface)); }
+.part[aria-pressed="false"] { border-style: dashed; opacity: .55; }
+.part:hover { border-color: var(--fg); opacity: 1; }
+.p-head { grid-area: head; width: 100%; } .p-body { grid-area: body; } .p-rarm { grid-area: rarm; } .p-larm { grid-area: larm; }
+.p-rleg, .p-lleg { grid-area: legs; width: calc(50% - 2px); } .p-lleg { justify-self: end; }
 .color-row .swap { flex: none; padding: 7px; }
 .tool-opt output { font-variant-numeric: tabular-nums; text-align: right; color: var(--fg); }
 .tool { position: relative; aspect-ratio: 1; display: grid; place-items: center; border: 1px solid var(--line); background: var(--surface); border-radius: 8px; cursor: pointer; }

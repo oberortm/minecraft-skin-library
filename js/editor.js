@@ -15,7 +15,7 @@ const ed = {
   open: false, skin: null, onSave: null,
   tex: null, ctx: null,
   model: "classic", layer: "base", tool: "pencil", color: "#3b6fe0",
-  show: { base: true, outer: true }, mirror: false, noise: 0.25, color2: "#0f2a5c", mode: "3d", space: false,
+  show: { base: true, outer: true }, parts: { head: true, body: true, rightArm: true, leftArm: true, rightLeg: true, leftLeg: true }, mirror: false, noise: 0.25, color2: "#0f2a5c", mode: "3d", space: false,
   undo: [], redo: [], dirty: false,
   stroke: null, hover: null, hover3d: null, p3d: null, p3dFailed: false, frame: 0,
 };
@@ -192,6 +192,13 @@ function drawTexCanvas() {
   ctx.globalAlpha = 0.6;
   ctx.fill("evenodd");
   ctx.restore();
+  // parts hidden in 3D: darker here, but still paintable
+  const hidden = faces.filter(f => !ed.parts[f.part]);
+  if (hidden.length) {
+    ctx.save(); ctx.fillStyle = css("--fg"); ctx.globalAlpha = 0.45;
+    for (const f of hidden) { const [x, y, w, h] = f.rect; ctx.fillRect(x * S, y * S, w * S, h * S); }
+    ctx.restore();
+  }
   if ($("eGrid").checked) {
     ctx.strokeStyle = css("--fg"); ctx.globalAlpha = 0.08; ctx.lineWidth = 1;
     ctx.beginPath();
@@ -438,6 +445,10 @@ function setShow(layer, on) {
   setHover3d(null);
   redraw();
 }
+function syncParts() {
+  document.querySelectorAll("#eParts .part").forEach(b => b.setAttribute("aria-pressed", String(ed.parts[b.dataset.part])));
+  if (ed.p3d) ed.p3d.setParts(ed.parts);
+}
 function syncShow() {
   $("eShowBase").setAttribute("aria-pressed", String(ed.show.base));
   $("eShowOuter").setAttribute("aria-pressed", String(ed.show.outer));
@@ -477,7 +488,7 @@ async function setMode(mode) {
     p3d.attach(mode === "3d" ? $("ePaint3d") : $("eView3d"));
     p3d.setMode(mode === "3d" ? "paint" : "preview");
     p3d.setModel(ed.model);
-    syncShow();
+    syncShow(); syncParts();
     p3d.viewer.renderPaused = !ed.open;
     syncRotate();
   }
@@ -503,7 +514,8 @@ export async function openEditor(skin, onSave) {
   $("eDiscard").hidden = true;
   syncSeg("eModel", ed.model);
   syncSeg("eLayer", ed.layer);
-  syncShow();
+  for (const k of Object.keys(ed.parts)) ed.parts[k] = true;
+  syncShow(); syncParts();
   setTool("pencil");
   setColor(ed.color);
   renderRecent();
@@ -556,6 +568,11 @@ export function setupEditor() {
     setMode(b.dataset.v);
   });
   $("eLayer").addEventListener("click", e => { const b = e.target.closest("button[data-v]"); if (b) setLayer(b.dataset.v); });
+  $("eParts").addEventListener("click", e => {
+    const b = e.target.closest(".part"); if (!b) return;
+    ed.parts[b.dataset.part] = !ed.parts[b.dataset.part];
+    syncParts(); setHover3d(null); redraw();
+  });
   $("eShowBase").addEventListener("click", () => setShow("base", !ed.show.base));
   $("eShowOuter").addEventListener("click", () => setShow("outer", !ed.show.outer));
   $("eMirror").addEventListener("change", e => { ed.mirror = e.target.checked; });

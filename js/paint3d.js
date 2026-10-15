@@ -83,6 +83,12 @@ export class Paint3D {
     this.viewer.playerObject.skin.modelType = model === "slim" ? "slim" : "default";
   }
 
+  /** Hide whole body parts (both layers); hidden parts are ignored by the ray as well. */
+  setParts(parts) {
+    const skin = this.viewer.playerObject.skin;
+    for (const [id, on] of Object.entries(parts)) if (skin[id]) skin[id].visible = on;
+  }
+
   setLayers(base, outer) {
     this.layers = { base, outer };
     const skin = this.viewer.playerObject.skin;
@@ -117,6 +123,7 @@ export class Paint3D {
     this.ray.setFromCamera(this.ndc, this.viewer.camera);
     const meshes = [], outerSet = new Set();
     for (const part of this.viewer.playerObject.skin.getBodyParts()) {
+      if (!part.visible) continue;
       outerSet.add(part.outerLayer);
       if (target === "outer") meshes.push(part.outerLayer);
       else {
