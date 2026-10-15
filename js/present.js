@@ -3,6 +3,7 @@ import { t, applyI18n } from "./i18n.js";
 
 import { $ } from "./dom.js";
 import { load3d } from "./view3d.js";
+import { readPack, packCanvases, savePack, loadPack, clearPack } from "./pack.js";
 const KEY = "skin-library-present";
 const reduce = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -94,6 +95,7 @@ async function applyScene(id) {
   savePrefs();
   const v = st.viewer;
   if (group === "classic") {
+    togglePanel(false);
     dropWorld();
     const sc = SCENES.classic.find(s => s.id === id);
     if (v && st.base) {
@@ -112,6 +114,7 @@ async function applyScene(id) {
       st.worldMod = st.worldMod || await import("./mcworld.js");
       if (token !== st.token || !st.on) return;
       st.world = new st.worldMod.McWorld(v);
+      applySavedPack();
     }
     st.world.setLook(id);
     applyRotate(st.rotate);
@@ -126,6 +129,38 @@ function dropWorld() {
   if (!st.world) return;
   try { st.world.dispose(); } catch (e) { console.error("[skin-library] world cleanup failed:", e); }
   st.world = null;
+}
+
+// ---------- resource pack ----------
+async function applySavedPack() {
+  const pack = await loadPack();
+  syncPackUi(pack);
+  if (pack && st.world) st.world.setPack(await packCanvases(pack));
+}
+function syncPackUi(pack, msg, err = false) {
+  $("prPackName").textContent = pack ? pack.name : t("packOwn");
+  $("prPackClear").hidden = !pack;
+  const hint = $("prPackHint");
+  hint.textContent = msg || t("packHint");
+  hint.classList.toggle("err", err);
+}
+async function choosePack(file) {
+  syncPackUi(null, t("packLoading"));
+  try {
+    const pack = await readPack(file);
+    await savePack(pack);
+    if (st.world) st.world.setPack(await packCanvases(pack));
+    syncPackUi(pack);
+  } catch (e) {
+    // a wrong or empty file is a normal user mistake: explain it in the panel, no console noise
+    const saved = await loadPack();
+    syncPackUi(saved, t(e && e.message === "unsupported" ? "packUnsupported" : "packError"), true);
+  }
+}
+function togglePanel(open = $("prWorldPanel").hidden) {
+  $("prWorldPanel").hidden = !open;
+  $("prWorld").setAttribute("aria-expanded", String(open));
+  if (open) loadPack().then(p => syncPackUi(p));
 }
 
 function toggleGroup() {
@@ -338,6 +373,17 @@ export function setupPresentation() {
   // touch screens send no hover moves: any tap brings the controls back
   root.addEventListener("pointerdown", wake, true);
   $("hdrClose").addEventListener("click", closeHeader);
+  $("prWorld").addEventListener("click", () => togglePanel());
+  $("prPackPick").addEventListener("click", () => $("prPackInput").click());
+  $("prPackInput").addEventListener("change", e => { const f = e.target.files[0]; e.target.value = ""; if (f) choosePack(f); });
+  $("prPackClear").addEventListener("click", async () => {
+    await clearPack().catch(() => {});
+    if (st.world) st.world.setPack(null);
+    syncPackUi(null);
+  });
+  document.addEventListener("pointerdown", e => {
+    if (!$("prWorldPanel").hidden && !e.target.closest("#prWorldPanel, #prWorld")) togglePanel(false);
+  }, true);
   // a click anywhere outside the open header closes it
   document.addEventListener("pointerdown", e => {
     if (st.on && document.body.classList.contains("hdr-open") && !e.target.closest(".top, #prMenu")) closeHeader();
@@ -349,6 +395,7 @@ export function setupPresentation() {
     if (!st.on || e.target.matches("input, textarea, select") || document.querySelector("dialog[open]")) return;
     if (e.key === "ArrowRight") { e.preventDefault(); show(st.i + 1, 1); }
     else if (e.key === "ArrowLeft") { e.preventDefault(); show(st.i - 1, -1); }
+    else if (e.key === "Escape" && !$("prWorldPanel").hidden) togglePanel(false);
     else if (e.key === "Escape" && document.body.classList.contains("hdr-open")) closeHeader();
     else if (e.key === "Escape" && !document.fullscreenElement) stopPresentation();
     else if (e.key === " ") { e.preventDefault(); applyRotate(!st.rotate); }

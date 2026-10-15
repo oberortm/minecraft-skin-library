@@ -178,6 +178,25 @@ body.hdr-open .pr-menu { background: var(--pr-ui-on); color: var(--pr-ui-on-fg);
 .sw-night { background: radial-gradient(circle at 70% 30%, #dbe6ff 0 22%, #0b1a3d 24%); }
 .pr-icon:focus-visible, .pr-nav:focus-visible, .pr-pill:focus-visible { outline: 2px solid var(--pr-fg); outline-offset: 2px; }
 
+/* Minecraft world settings: gear button + small panel, only in the Minecraft group */
+.pr-world-btn { display: none !important; }
+.present[data-group="minecraft"] .pr-world-btn { display: grid !important; }
+.pr-world-btn[aria-expanded="true"] { background: var(--pr-ui-on); color: var(--pr-ui-on-fg); }
+.pr-panel {
+  position: absolute; z-index: 4; right: max(16px, env(safe-area-inset-right, 0px)); top: calc(max(16px, env(safe-area-inset-top, 0px)) + 54px);
+  width: min(320px, calc(100vw - 32px)); display: grid; gap: 10px; padding: 14px; border-radius: 18px;
+  /* the "on" text colour of each scene is its darkest/lightest tone: a solid, readable backdrop */
+  background: color-mix(in srgb, var(--pr-ui-on-fg) 90%, transparent); border: 1px solid var(--pr-ui-line); color: var(--pr-fg);
+  backdrop-filter: blur(18px) saturate(1.4); box-shadow: 0 18px 50px rgba(0,0,0,.25);
+}
+.pr-panel h3 { margin: 0; font: 600 14px var(--f-body); color: var(--pr-fg); text-transform: none; letter-spacing: 0; }
+.pr-panel-row { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+.pr-panel-label { font: 500 13px var(--f-body); color: var(--pr-muted); }
+.pr-pack-name { font: 600 13px var(--f-body); overflow-wrap: anywhere; }
+.pr-panel-hint { margin: 0; font: 400 12px/1.45 var(--f-body); color: var(--pr-muted); }
+.pr-panel-hint.err { color: #ff8f7a; }
+.present.idle .pr-panel:not([hidden]) { opacity: 1; }
+
 /* chrome fades away when idle */
 .present.idle .pr-nav, .present.idle .pr-controls, .present.idle .pr-corner { opacity: 0; pointer-events: none; }
 .present.idle .pr-controls { transform: translateY(12px); }

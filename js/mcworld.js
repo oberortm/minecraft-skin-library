@@ -381,13 +381,39 @@ export class McWorld {
   skinChanged() { this.player(true); }
 
   // ---------- blocks ----------
+  /** A block texture: from the user's resource pack if one is loaded, else drawn here. */
+  makeTexture(name) {
+    const img = (this.pack && this.pack[name]) || TEX[name](name.length * 131 + name.charCodeAt(0));
+    const t = new THREE.CanvasTexture(img);
+    t.magFilter = THREE.NearestFilter;
+    t.minFilter = THREE.NearestMipmapLinearFilter;
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = Math.min(4, this.viewer.renderer.capabilities.getMaxAnisotropy());
+    return t;
+  }
+
+  /** Swap in a resource pack ({ texName: canvas }) or go back to our own textures (null). */
+  setPack(canvases) {
+    this.pack = canvases || null;
+    const old = [...this.textures.values()];
+    this.textures.clear();
+    for (const [key, m] of this.materials) {
+      const t = this.texture(key.split("|")[0]);
+      if (m.emissiveMap) m.emissiveMap = t;
+      m.map = t; m.needsUpdate = true;
+    }
+    if (this.water) {
+      const wm = this.water.material, wt = this.makeTexture("water");
+      wt.wrapS = wt.wrapT = THREE.RepeatWrapping; wt.repeat.set(140, 140); wt.minFilter = THREE.NearestFilter;
+      const prev = wm.map; wm.map = wt; wm.needsUpdate = true;
+      this.disposables = this.disposables.filter(d => d !== prev); prev.dispose(); this.disposables.push(wt);
+    }
+    old.forEach(t => t.dispose());
+  }
+
   texture(name) {
     if (!this.textures.has(name)) {
-      const t = new THREE.CanvasTexture(TEX[name](name.length * 131 + name.charCodeAt(0)));
-      t.magFilter = THREE.NearestFilter;
-      t.minFilter = THREE.NearestMipmapLinearFilter;
-      t.colorSpace = THREE.SRGBColorSpace;
-      t.anisotropy = Math.min(4, this.viewer.renderer.capabilities.getMaxAnisotropy());
+      const t = this.makeTexture(name);
       this.textures.set(name, t);
     }
     return this.textures.get(name);
@@ -517,8 +543,8 @@ export class McWorld {
     for (const [x, z] of [[5, 4], [-6, 3], [4, -6]]) cells.push(["stone", x, (tops.get(x + "," + z) ?? 0) + 1, z]);
     const g = this.buildBlocks(dedupe(cells), 21);
     // water: one big plane, fades into the fog
-    const wt = new THREE.CanvasTexture(TEX.water(9));
-    wt.wrapS = wt.wrapT = THREE.RepeatWrapping; wt.repeat.set(140, 140); wt.magFilter = THREE.NearestFilter; wt.colorSpace = THREE.SRGBColorSpace;
+    const wt = this.makeTexture("water");
+    wt.wrapS = wt.wrapT = THREE.RepeatWrapping; wt.repeat.set(140, 140); wt.minFilter = THREE.NearestFilter;
     const water = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000),
       new THREE.MeshStandardMaterial({ map: wt, roughness: 0.12, metalness: 0.1, transparent: true, opacity: 0.88 }));
     water.rotation.x = -Math.PI / 2;
