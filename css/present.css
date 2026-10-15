@@ -230,8 +230,9 @@ body.hdr-open .pr-menu { background: var(--pr-ui-on); color: var(--pr-ui-on-fg);
 }
 
 /* armour rows in the equipment panel */
-#eqArmor { display: grid; gap: 10px; }
-#eqArmor:empty { display: none; }
+#eqArmor, #eqItems { display: grid; gap: 10px; }
+:is(#eqArmor, #eqItems):empty { display: none; }
+.eq-toolmat[hidden] { display: none; }
 .eq-slot { display: grid; gap: 6px; padding-top: 8px; border-top: 1px solid var(--pr-ui-line); }
 .eq-slot .pr-select { min-width: 0; flex: 1 1 100px; }
 .eq-dye { width: 34px; height: 30px; padding: 0; border: 1px solid var(--pr-ui-line); border-radius: 8px; background: none; cursor: pointer; }

@@ -3,7 +3,7 @@ import { t, applyI18n } from "./i18n.js";
 
 import { $ } from "./dom.js";
 import { load3d } from "./view3d.js";
-import { loadEquipment, saveEquipment, applyElytra, applyArmor, ARMOR_SLOTS, ARMOR_MATS, TRIM_PATTERNS, TRIM_MATS } from "./equipment.js";
+import { loadEquipment, saveEquipment, applyElytra, applyArmor, ARMOR_SLOTS, ARMOR_MATS, TRIM_PATTERNS, TRIM_MATS, applyItems, ITEMS, TOOL_MATS } from "./equipment.js";
 import { readPack, packCanvases, savePack, loadPack, SOURCES, downloadSource, selectedSource, selectSource } from "./pack.js";
 const KEY = "skin-library-present";
 const QUALITY_KEY = "skin-library-mc-quality";
@@ -144,7 +144,10 @@ async function applyEquipment() {
   try {
     await applyElytra(v, st.equip.elytra, st.packTex);
     const kit = await load3d();
-    if (kit && st.viewer === v) applyArmor(v, kit.THREE, st.equip.armor, st.packTex);
+    if (kit && st.viewer === v) {
+      applyArmor(v, kit.THREE, st.equip.armor, st.packTex);
+      applyItems(v, kit.THREE, st.equip.hands, st.packTex);
+    }
   } catch (e) { console.error("[skin-library] equipment failed:", e); }
   if (st.world) st.world.skinChanged();
 }
@@ -162,6 +165,39 @@ function syncEquipUi() {
     row.querySelector(".eq-glint").checked = !!p.glint;
     row.querySelector(".eq-glint").disabled = !p.mat;
   }
+  for (const hand of ["main", "off"]) {
+    const h = st.equip.hands[hand], row = document.querySelector(`.eq-hand[data-hand="${hand}"]`);
+    row.querySelector(".eq-item").value = h.item || "";
+    row.querySelector(".eq-toolmat").value = h.mat;
+    row.querySelector(".eq-toolmat").hidden = !h.item || !ITEMS[h.item];
+    row.querySelector(".eq-glint").checked = !!h.glint;
+    row.querySelector(".eq-glint").disabled = !h.item;
+  }
+}
+/** Main hand and off hand: any item, its material for tools, enchanted. */
+function buildItemsUi() {
+  const opt = (v, key) => `<option value="${v}" data-i18n="${key}"></option>`;
+  const items = opt("", "handEmpty") + Object.keys(ITEMS).map(i => opt(i, "item_" + i)).join("");
+  const mats = TOOL_MATS.map(m => opt(m, "tool_" + m)).join("");
+  $("eqItems").innerHTML = `<h3 data-i18n="items"></h3>` + ["main", "off"].map(hand => `
+    <div class="eq-slot eq-hand" data-hand="${hand}" role="group" aria-labelledby="eq-${hand}">
+      <span class="pr-panel-label" id="eq-${hand}" data-i18n="hand_${hand}"></span>
+      <div class="pr-panel-row">
+        <select class="pr-select eq-item" data-i18n-title="hand_${hand}">${items}</select>
+        <select class="pr-select eq-toolmat" data-i18n-title="armorMaterial">${mats}</select>
+        <label class="pr-check"><input type="checkbox" class="eq-glint"> <span data-i18n="enchanted"></span></label>
+      </div>
+    </div>`).join("");
+  applyI18n($("eqItems"));
+  $("eqItems").addEventListener("input", e => {
+    const row = e.target.closest(".eq-hand");
+    if (!row) return;
+    const h = st.equip.hands[row.dataset.hand], el = e.target;
+    if (el.classList.contains("eq-item")) h.item = el.value || null;
+    else if (el.classList.contains("eq-toolmat")) h.mat = el.value;
+    else if (el.classList.contains("eq-glint")) h.glint = el.checked;
+    saveEquipment(st.equip); syncEquipUi(); applyEquipment();
+  });
 }
 /** The armour rows: material (+ dye for leather), enchanted, trim pattern and trim material per piece. */
 function buildArmorUi() {
@@ -588,6 +624,7 @@ export function setupPresentation() {
   $("prEquip").addEventListener("click", () => toggleEquipPanel());
   $("eqElytra").addEventListener("change", e => setElytra(e.target.checked));
   buildArmorUi();
+  buildItemsUi();
   document.addEventListener("pointerdown", e => {
     if (!$("prEquipPanel").hidden && !e.target.closest("#prEquipPanel, #prEquip")) toggleEquipPanel(false);
   }, true);

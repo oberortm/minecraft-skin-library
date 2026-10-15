@@ -4,6 +4,8 @@
 // few textures the scenes use are unpacked and kept in this browser (its own IndexedDB, separate
 // from the skins). Nothing is part of this website or uploaded anywhere.
 
+import { itemFiles } from "./equipment.js";
+
 const DB_NAME = "skin-library-pack";
 const STORE = "pack";
 
@@ -41,6 +43,7 @@ for (const p of ["sentry", "dune", "coast", "wild", "ward", "eye", "vex", "tide"
   FILES["trim_" + p] = [["trims/entity/humanoid/" + p, "trims/models/armor/" + p]];
   FILES["trim2_" + p] = [["trims/entity/humanoid_leggings/" + p, "trims/models/armor/" + p + "_leggings"]];
 }
+Object.assign(FILES, itemFiles());
 for (const m of ["quartz", "iron", "netherite", "redstone", "copper", "gold", "emerald", "diamond", "lapis", "amethyst", "resin"]) {
   FILES["pal_" + m] = [["trims/color_palettes/" + m]];
 }

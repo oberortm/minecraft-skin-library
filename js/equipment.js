@@ -5,7 +5,7 @@
 const KEY = "skin-library-equipment";
 
 export function defaultEquipment() {
-  return { elytra: false, armor: {} };
+  return { elytra: false, armor: {}, hands: {} };
 }
 export function loadEquipment() {
   const e = defaultEquipment();
@@ -17,6 +17,13 @@ export function loadEquipment() {
     if (p.trim && !TRIM_PATTERNS.includes(p.trim)) p.trim = null;
     if (!TRIM_MATS[p.trimMat]) p.trimMat = "gold";
     e.armor[s] = p;
+  }
+  if (!e.hands || typeof e.hands !== "object") e.hands = {};
+  for (const h of ["main", "off"]) {
+    const p = Object.assign(emptyHand(), e.hands[h] || {});
+    if (p.item && !(p.item in ITEMS)) p.item = null;
+    if (!TOOL_MATS.includes(p.mat)) p.mat = "iron";
+    e.hands[h] = p;
   }
   // the game does not allow both on the back: an elytra replaces the chestplate
   if (e.elytra) e.armor.chest.mat = null;
@@ -299,5 +306,246 @@ export function applyArmor(viewer, THREE, armor, pack) {
       g.onBeforeRender = () => { glintTex.offset.set((performance.now() / 9000) % 1, (performance.now() / 14000) % 1); };
       parent.add(g); list.push(g);
     }
+  }
+}
+
+// ---------- items in the hands ----------
+export const TOOL_MATS = ["wood", "stone", "copper", "iron", "gold", "diamond", "netherite"];
+/** Every item, with whether it comes in tool materials. Both hands can hold any of them. */
+export const ITEMS = { sword: true, axe: true, pickaxe: true, spear: true, mace: false, trident: false, bow: false, crossbow: false, shield: false, totem: false, torch: false, map: false };
+export function emptyHand() { return { item: null, mat: "iron", glint: false }; }
+const TOOL_COLORS = {
+  wood: ["#a07a46", "#c49a5e", "#6b4f2a"], stone: ["#8a8a8a", "#ababab", "#5e5e5e"], copper: ["#c96f4c", "#ec9a78", "#874230"],
+  iron: ["#d4d4d4", "#ffffff", "#8f8f8f"], gold: ["#f0cf4a", "#fff38a", "#b08a1e"], diamond: ["#4fe0d6", "#b4fff8", "#2a9a94"],
+  netherite: ["#4a4446", "#6e6668", "#2b2628"],
+};
+const WOOD = ["#8d6a3f", "#6b4a2a", "#4a3219"];
+/** Where the hand grips each 16x16 sprite (x, y in pixels). */
+const GRIP = { sword: [3, 12.5], axe: [3, 12.5], pickaxe: [3, 12.5], spear: [4, 11.5], mace: [3.5, 12], trident: [4, 11.5], bow: [9.5, 9.5], crossbow: [5, 10.5], totem: [8, 13], torch: [8, 14], map: [8, 12] };
+
+/** File names in the game's textures (new names, then 1.8-1.12). */
+export function itemFiles() {
+  const out = {}, old = { wood: "wood", stone: "stone", copper: "copper", iron: "iron", gold: "gold", diamond: "diamond", netherite: "netherite" };
+  const nw = { wood: "wooden", stone: "stone", copper: "copper", iron: "iron", gold: "golden", diamond: "diamond", netherite: "netherite" };
+  for (const m of TOOL_MATS) for (const it of ["sword", "axe", "pickaxe", "spear"]) {
+    out[`item_${it}_${m}`] = [[`item/${nw[m]}_${it}`, `items/${old[m]}_${it}`]];
+  }
+  Object.assign(out, {
+    item_mace: [["item/mace"]], item_trident: [["item/trident"]], item_bow: [["item/bow", "items/bow_standby"]],
+    item_crossbow: [["item/crossbow_standby"]], item_totem: [["item/totem_of_undying", "items/totem"]],
+    item_torch: [["block/torch", "blocks/torch_on"]], item_map: [["item/map", "items/map_empty"]],
+    shield: [["entity/shield/shield_base_nopattern", "entity/shield_base_nopattern"]],
+  });
+  return out;
+}
+
+/** Our own 16x16 item drawings. Shapes follow the usual diagonal (handle bottom left, tip top right). */
+function drawItem(item, mat) {
+  const [c, ctx] = canvas(16, 16), r = rng(item.length * 7 + 3);
+  const px = (x, y, col) => { if (x >= 0 && y >= 0 && x < 16 && y < 16) { ctx.fillStyle = col; ctx.fillRect(x, y, 1, 1); } };
+  const [m, M, d] = TOOL_COLORS[mat] || TOOL_COLORS.iron;
+  const handle = (x0, x1) => { for (let x = x0; x <= x1; x++) { px(x, 15 - x, WOOD[0]); px(x + 1, 15 - x, WOOD[1]); } };
+  switch (item) {
+    case "sword":
+      for (let x = 5; x <= 15; x++) { px(x, 15 - x, M); px(x, 16 - x, m); px(x, 17 - x, d); }
+      px(15, 0, M); px(15, 1, d);
+      handle(1, 3); px(0, 15, d); px(1, 15, d); px(0, 14, d);
+      for (let k = -3; k <= 2; k++) px(5 + k, 11 + k, k === 0 ? M : d);
+      break;
+    case "pickaxe":
+      handle(1, 9);
+      for (let k = -6; k <= 6; k++) {
+        const b = Math.abs(k) >= 4 ? 1 : 0, x = 9 + k - b, y = 6 + k + b - 2 * b * Math.sign(k) * 0;
+        px(x, y, Math.abs(k) >= 5 ? d : m); px(x + 1, y - 1, Math.abs(k) <= 3 ? M : m);
+      }
+      break;
+    case "axe":
+      handle(1, 10);
+      for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+        const s = x - y, dist = 15 - (x + y);
+        if (s >= -1 && s <= 7 && dist >= 1 && dist <= 5 && !(dist === 5 && (s <= 0 || s >= 6))) px(x, y, dist === 5 || dist === 4 && (s === -1 || s === 7) ? M : dist === 1 ? d : m);
+      }
+      break;
+    case "spear":
+      for (let x = 0; x <= 11; x++) { px(x, 15 - x, x % 3 ? WOOD[0] : WOOD[1]); }
+      for (let y = 0; y <= 5; y++) for (let x = 10; x < 16; x++) {
+        const w = x <= 11 ? 1 : x <= 13 ? 1 : 0, dd = x + y - 15;
+        if (Math.abs(dd) <= w && (x >= 11 || dd === 0)) px(x, y, dd < 0 ? M : dd > 0 ? d : m);
+      }
+      px(10, 5, d); px(11, 6, d); px(9, 4, d);
+      break;
+    case "mace":
+      handle(2, 7); px(1, 14, "#3a3a3a"); px(2, 14, "#3a3a3a");
+      for (let y = 2; y <= 7; y++) for (let x = 8; x <= 13; x++) px(x, y, (x + y) % 3 ? "#5b5b5f" : "#46464a");
+      for (const [x, y] of [[8, 2], [13, 2], [8, 7], [13, 7], [10, 1], [11, 1], [14, 4], [14, 5], [10, 8], [11, 8], [7, 4], [7, 5]]) px(x, y, "#a5a5ac");
+      px(10, 4, "#c9b26a"); px(11, 5, "#c9b26a");
+      break;
+    case "trident": {
+      const T = ["#3f8c7c", "#7cc9b4", "#245a4f"];
+      for (let x = 0; x <= 15; x++) { px(x, 15 - x, x > 11 ? T[1] : T[0]); if (x <= 11) px(x + 1, 15 - x, T[2]); }
+      for (const [x, y] of [[9, 2], [10, 3], [12, 5], [13, 6], [10, 1], [11, 0], [14, 5], [15, 4]]) px(x, y, T[1]);
+      px(11, 4, T[2]);
+      break;
+    }
+    case "bow":
+      for (let a = 0; a <= 90; a += 3) for (const rr of [12, 11]) {
+        const x = Math.round(2 + rr * Math.cos(a * Math.PI / 180)), y = Math.round(2 + rr * Math.sin(a * Math.PI / 180));
+        px(x, y, a > 35 && a < 55 ? WOOD[2] : rr === 12 ? WOOD[1] : WOOD[0]);
+      }
+      for (let x = 3; x <= 13; x++) px(x, 16 - x, "#dcdcdc");
+      break;
+    case "crossbow":
+      for (let x = 1; x <= 12; x++) { px(x, 15 - x, WOOD[1]); px(x + 1, 15 - x, WOOD[2]); }
+      for (let k = -5; k <= 5; k++) { const b = Math.floor(Math.abs(k) / 3); px(9 + k - b, 6 + k + b, WOOD[0]); }
+      for (let k = -4; k <= 4; k++) if (Math.abs(k) > 1) { const b = Math.abs(k) <= 2 ? 2 : 1; px(9 + k - b - 1, 6 + k + b + 1, "#cfcfcf"); }
+      px(9, 6, "#9a9a9a"); px(10, 5, "#9a9a9a"); px(3, 12, "#9a9a9a");
+      break;
+    case "totem": {
+      const G = ["#f2c94c", "#ffe98a", "#c99a2e"];
+      for (let y = 1; y <= 6; y++) for (let x = 5; x <= 10; x++) px(x, y, y === 1 ? G[1] : G[0]);
+      px(6, 3, "#16b84a"); px(9, 3, "#16b84a"); px(7, 5, G[2]); px(8, 5, G[2]);
+      for (let y = 7; y <= 12; y++) for (let x = 4; x <= 11; x++) px(x, y, x === 4 || x === 11 ? G[2] : G[0]);
+      for (let y = 8; y <= 11; y++) { px(2, y, G[1]); px(3, y, G[0]); px(12, y, G[0]); px(13, y, G[1]); }
+      for (let x = 6; x <= 9; x++) { px(x, 13, G[2]); px(x, 14, G[2]); }
+      px(7, 9, "#16b84a"); px(8, 9, "#16b84a");
+      break;
+    }
+    case "torch":
+      for (let y = 6; y <= 15; y++) { px(7, y, WOOD[0]); px(8, y, WOOD[1]); }
+      px(7, 4, "#ffe36a"); px(8, 4, "#fff3b0"); px(7, 5, "#ffb02a"); px(8, 5, "#ff8a1a"); px(7, 3, "#ffd23a");
+      break;
+    case "map":
+      for (let y = 1; y <= 14; y++) for (let x = 1; x <= 14; x++) {
+        const edge = x === 1 || y === 1 || x === 14 || y === 14;
+        px(x, y, edge ? "#b9a77f" : r() < 0.45 ? "#e9dfc4" : r() < 0.5 ? "#8fb86a" : "#7fa6d9");
+      }
+      px(7, 7, "#d23a2a"); px(8, 7, "#d23a2a"); px(7, 8, "#d23a2a");
+      break;
+  }
+  return c;
+}
+
+/** Our own shield texture in the game's layout (64x64: plate at 0,0 12x22x1, handle at 26,0 2x6x6). */
+function drawShield() {
+  const [c, ctx] = canvas(64, 64), r = rng(11);
+  for (let y = 0; y < 24; y++) for (let x = 0; x < 28; x++) {
+    ctx.fillStyle = (x % 4 === 0) ? "#6b4a2a" : r() < 0.2 ? "#9a7546" : "#8a663b"; ctx.fillRect(x, y, 1, 1);
+  }
+  ctx.fillStyle = "#9da3a8";                                              // iron rim and boss on the front
+  ctx.fillRect(1, 1, 12, 1); ctx.fillRect(1, 22, 12, 1); ctx.fillRect(1, 1, 1, 22); ctx.fillRect(12, 1, 1, 22);
+  ctx.fillRect(6, 10, 2, 3);
+  ctx.fillStyle = "#4a3219"; ctx.fillRect(26, 0, 16, 12);
+  return c;
+}
+
+/** Turn a sprite into a solid 1-pixel-thick model, like the game shows held items. 16 units wide. */
+function extrude(cv, THREE) {
+  const N = cv.width, data = cv.getContext("2d").getImageData(0, 0, N, N).data, pu = 16 / N;
+  const solid = (i, j) => i >= 0 && j >= 0 && i < N && j < N && data[(j * N + i) * 4 + 3] > 127;
+  const pos = [], nor = [], uv = [];
+  const quad = (a, b, c2, d, n, u, v) => {
+    for (const p of [a, b, c2, a, c2, d]) { pos.push(...p); nor.push(...n); uv.push(u, v); }
+  };
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    if (!solid(i, j)) continue;
+    const x0 = i * pu, x1 = x0 + pu, y1 = -j * pu, y0 = y1 - pu, z0 = -0.5, z1 = 0.5, u = (i + 0.5) / N, v = 1 - (j + 0.5) / N;
+    quad([x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1], [0, 0, 1], u, v);
+    quad([x1, y0, z0], [x0, y0, z0], [x0, y1, z0], [x1, y1, z0], [0, 0, -1], u, v);
+    if (!solid(i - 1, j)) quad([x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0], [-1, 0, 0], u, v);
+    if (!solid(i + 1, j)) quad([x1, y0, z1], [x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [1, 0, 0], u, v);
+    if (!solid(i, j - 1)) quad([x0, y1, z1], [x1, y1, z1], [x1, y1, z0], [x0, y1, z0], [0, 1, 0], u, v);
+    if (!solid(i, j + 1)) quad([x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1], [0, -1, 0], u, v);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3));
+  geo.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
+  return geo;
+}
+
+/** Remove the held items. */
+function clearItems(viewer) {
+  for (const m of viewer.playerObject.userData.items || []) {
+    m.parent && m.parent.remove(m);
+    m.traverse(o => { if (o.isMesh) { o.geometry.dispose(); if (o.material.map && o.material.map.userData.own) o.material.map.dispose(); o.material.dispose(); } });
+  }
+  viewer.playerObject.userData.items = [];
+}
+
+/** Put items into the hands. hands: { main, off } (see emptyHand). Main hand = right arm. */
+export function applyItems(viewer, THREE, hands, pack) {
+  clearItems(viewer);
+  const skin = viewer.playerObject.skin, list = viewer.playerObject.userData.items;
+  const tex = cv => {
+    const t = new THREE.CanvasTexture(cv);
+    t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; t.userData.own = true; t.userData.equipment = true;
+    return t;
+  };
+  const glintTex = () => {
+    const t = new THREE.CanvasTexture((pack && pack.glint_item) || drawGlint());
+    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.userData.own = true;
+    return t;
+  };
+  const glintMat = t => {
+    const g = new THREE.MeshBasicMaterial({ map: t, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false });
+    return g;
+  };
+  for (const [hand, part, side] of [["main", skin.rightArm, -1], ["off", skin.leftArm, 1]]) {
+    const h = hands && hands[hand];
+    if (!h || !h.item || !(h.item in ITEMS)) continue;
+    const pivot = part.children.find(o => o.isGroup) || part;
+    const holder = new THREE.Group();
+    let meshes = [];
+    if (h.item === "shield") {
+      const t = tex((pack && pack.shield) || drawShield());
+      const mat = new THREE.MeshStandardMaterial({ map: t, alphaTest: 0.1, roughness: 0.7 });
+      const plate = new THREE.BoxGeometry(12, 22, 1); boxUVs(plate, 0, 0, 12, 22, 1, 64, 64);
+      const grip = new THREE.BoxGeometry(2, 6, 6); boxUVs(grip, 26, 0, 2, 6, 6, 64, 64);
+      const a = new THREE.Mesh(plate, mat), b = new THREE.Mesh(grip, mat);
+      a.position.set(0, 0, 3.5); b.position.set(0, 0, 0);
+      meshes = [a, b];
+      // held at the outer side of the arm, front facing forwards, slightly turned out
+      holder.scale.setScalar(0.62);
+      holder.position.set(side * 2.6, -4.5, 0.5);
+      holder.rotation.set(0, side * 0.25, 0);
+    } else {
+      const key = ITEMS[h.item] ? `item_${h.item}_${h.mat}` : `item_${h.item}`;
+      const cv = (pack && pack[key]) || drawItem(h.item, h.mat);
+      const geo = extrude(cv, THREE);
+      const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: tex(cv), roughness: 0.6 }));
+      const [gx, gy] = GRIP[h.item];
+      mesh.position.set(-gx, gy, 0);
+      const inner = new THREE.Group();
+      inner.add(mesh);
+      if (h.item === "map") {
+        // a map is held up with its face to the front
+        inner.rotation.set(0, 0, 0); holder.position.set(side * -0.5, -5.5, 2.5); holder.rotation.x = -0.5;
+      } else {
+        // sprite x -> forwards, so the tool points ahead of the figure, tilted a little down
+        inner.rotation.y = -Math.PI / 2;
+        holder.position.set(0, -5.2, 0.2); holder.rotation.x = 0.35;
+      }
+      holder.scale.setScalar(0.78);
+      holder.add(inner);
+      meshes = [mesh];
+      if (h.glint) {
+        const t = glintTex(), g = new THREE.Mesh(geo, glintMat(t));
+        g.position.copy(mesh.position); g.scale.setScalar(1.01);
+        g.onBeforeRender = () => { t.offset.set((performance.now() / 6000) % 1, (performance.now() / 9000) % 1); };
+        inner.add(g);
+      }
+    }
+    if (h.item === "shield") for (const m of meshes) holder.add(m);
+    if (h.glint && h.item === "shield") {
+      const t = glintTex();
+      for (const m of meshes) {
+        const g = new THREE.Mesh(m.geometry.clone(), glintMat(t));
+        g.position.copy(m.position); g.scale.setScalar(1.01);
+        g.onBeforeRender = () => { t.offset.set((performance.now() / 6000) % 1, (performance.now() / 9000) % 1); };
+        holder.add(g);
+      }
+    }
+    holder.traverse(o => { if (o.isMesh) o.castShadow = true; });
+    pivot.add(holder); list.push(holder);
   }
 }
