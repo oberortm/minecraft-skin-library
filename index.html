@@ -322,6 +322,8 @@
         <label class="tool-opt"><span data-i18n="opacity"></span><input type="range" id="eAlpha" min="0" max="100" step="5" value="100"><output id="eAlphaOut">100 %</output></label>
         <p class="hint" id="eAlphaHint" hidden data-i18n="opacityHint"></p>
         <div class="swatches" id="eRecent" aria-label="recent"></div>
+        <h3><span data-i18n="paletteTitle"></span> <span class="pal-count" id="ePaletteCount"></span></h3>
+        <div class="swatches" id="ePalette"></div>
         <h3 data-i18n="visible"></h3>
         <div class="layer-toggles">
           <button class="chip" type="button" id="eShowBase" aria-pressed="true" data-i18n="layerBody"></button>
@@ -342,6 +344,12 @@
           <label class="tex-only"><input type="checkbox" id="eRegions"> <span data-i18n="regions"></span></label>
         </div>
         <p class="hint" data-i18n="baseOpaque"></p>
+        <h3 data-i18n="extras"></h3>
+        <div class="extras">
+          <button class="btn" type="button" id="eCopyBtn" data-i18n="copyOpen"></button>
+          <button class="btn" type="button" id="eAdjustBtn" data-i18n="adjustOpen"></button>
+          <button class="btn" type="button" id="eStampBtn" data-i18n="stampOpen"></button>
+        </div>
       </aside>
       <div class="ed-canvas" id="eCanvas" data-mode="3d">
         <div class="ed-mode">
@@ -389,6 +397,7 @@
     "./js/equipart.js": "./js/equipart.js?v=47",
     "./js/player.js": "./js/player.js?v=47",
     "./js/pfp.js": "./js/pfp.js?v=47",
+    "./js/edextra.js": "./js/edextra.js?v=47",
     "./js/mcworld.js": "./js/mcworld.js?v=47",
     "skinview3d": "./vendor/skinview3d@3.0.1/skinview3d.js",
     "skinview-utils": "./vendor/skinview-utils@0.7.1/index.js",
@@ -429,6 +438,7 @@
 <link rel="modulepreload" href="js/equipart.js?v=47">
 <link rel="modulepreload" href="js/player.js?v=47">
 <link rel="modulepreload" href="js/pfp.js?v=47">
+<link rel="modulepreload" href="js/edextra.js?v=47">
 <link rel="modulepreload" href="js/pack.js?v=47">
 <script type="module" src="js/app.js?v=47"></script>
 </body>

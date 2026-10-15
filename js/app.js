@@ -482,7 +482,7 @@ function startEditor(skin) {
     toast(t("saved"));
     setTimeout(() => openDetail(target.id), 50);
     return target;
-  });
+  }, state.skins);
 }
 
 // ---------- settings ----------

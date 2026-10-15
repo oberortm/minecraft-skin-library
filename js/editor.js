@@ -4,6 +4,7 @@ import { drawRegions } from "./app.js";
 import { $ } from "./dom.js";
 import { load3d } from "./view3d.js";
 import { Paint3D } from "./paint3d.js";
+import { setupExtras, renderPalette } from "./edextra.js";
 
 const S = 10; // texture canvas scale (64 px -> 640 px)
 const RECENT_KEY = "skin-library-recent-colors";
@@ -252,6 +253,9 @@ function redraw() {
   if (ed.mode === "tex") { drawTexCanvas(); drawFigures(); }
   else drawMini();
   update3d();
+  // the "colours in this skin" palette follows the texture, a moment after painting stops
+  clearTimeout(ed.paletteTimer);
+  ed.paletteTimer = setTimeout(renderPalette, 300);
 }
 
 // ---------- pointer handling: texture view and flat figures ----------
@@ -506,8 +510,8 @@ async function setMode(mode) {
 }
 
 // ---------- open / close ----------
-export async function openEditor(skin, onSave) {
-  ed.skin = skin; ed.onSave = onSave;
+export async function openEditor(skin, onSave, library = []) {
+  ed.skin = skin; ed.onSave = onSave; ed.library = library;
   ed.tex = document.createElement("canvas"); ed.tex.width = 64; ed.tex.height = 64;
   ed.ctx = ed.tex.getContext("2d", { willReadFrequently: true });
   ed.onePx = null;
@@ -561,6 +565,12 @@ async function save(asCopy) {
 
 // ---------- wiring (once, called from boot) ----------
 export function setupEditor() {
+  setupExtras({
+    ed, snapshot, redraw, aw,
+    library: () => ed.library || [],
+    markDirty: () => { ed.dirty = true; },
+    pickColor: c => { setColor(c); if (ed.tool === "eraser" || ed.tool === "picker" || ed.tool === "rotate") setTool("pencil"); },
+  });
   bindPaint($("eTex"), texPoint);
   bindPaint($("eFront"), e => figurePoint($("eFront"), "front", e));
   bindPaint($("eBack"), e => figurePoint($("eBack"), "back", e));
