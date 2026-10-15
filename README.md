@@ -18,7 +18,7 @@ Persönliche Minecraft-Skin-Bibliothek im Browser: Skins per Drag & Drop sammeln
   - *Classic:* Studio (weiß), Spotlight (schwarz), Golden hour (Sonnenuntergang), Moonlight (Nacht) als Bühnen-Hintergründe.
   - *Minecraft:* dieselben vier Stimmungen als echte 3D-Blockwelt, in der der Skin steht: weißer Raum, dunkler Raum mit Lichtkegel und leuchtenden Blöcken, Sonnenaufgang über einer kleinen Insel, Nacht mit Mond, Sternen, Laternen und Glühwürmchen. Weiche Echtzeit-Schatten, ACES-Tonemapping, Nebel, Himmelsverlauf, Bloom und Sonnenstrahlen. Alle Block-Texturen werden im Code erzeugt (16×16 Pixel-Rauschen), es werden keine Spielgrafiken verwendet. Auf Handys und schwachen Geräten läuft automatisch eine leichtere Qualitätsstufe (kleinere Schatten, kein Bloom).
   
-  Animationen (Stehen, Gehen, Rennen, Fliegen), Drehen, Vollbild. Gruppe und Szene werden gemerkt. Das Menü versteckt sich und kommt über den Menü-Button oben links zurück.
+  Animationen (Stehen, Gehen, Rennen, Fliegen), Drehen, Vollbild. Gruppe und Szene werden gemerkt. Das Menü versteckt sich und kommt über den Menü-Button oben links zurück; geschlossen wird es mit ✕, einem Klick in die Szene oder Esc.
 - **Oberfläche:** Ein klarer Look mit 3D-Figuren in den Karten, Hell/Dunkel und Englisch/Deutsch per Knopfdruck im Header.
 
 ### Tastenkürzel im Editor
@@ -49,7 +49,7 @@ Auf dem Handy malt ein Finger, zwei Finger drehen und zoomen.
 | `Leertaste` | Drehen an/aus |
 | `1`–`4` | Szene der aktuellen Gruppe wählen |
 | `G` | Gruppe wechseln (Classic / Minecraft) |
-| `M` | Menü einblenden |
+| `M` | Menü einblenden (`Esc` schließt es wieder) |
 | `Esc` | Präsentation beenden |
 
 ## Datenschutz

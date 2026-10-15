@@ -14,6 +14,13 @@ body.presenting .top {
   transform: translateY(-110%); transition: transform .45s cubic-bezier(.2, .8, .2, 1);
 }
 body.presenting.hdr-open .top { transform: none; }
+/* while the header is open, a close button sits exactly where the menu button is */
+.hdr-close { display: none; }
+body.presenting .hdr-close {
+  display: grid; place-items: center; position: absolute; left: max(16px, env(safe-area-inset-left, 0px)); top: max(16px, env(safe-area-inset-top, 0px));
+  width: 44px; height: 44px; border-radius: 50%; border: 0; background: var(--fg); color: var(--bg); cursor: pointer;
+}
+body.presenting .hdr-close:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
 body.presenting .top h1 { font-size: 34px; }
 body.presenting .top h1 .ch { animation: none; }
 body.presenting .top .tagline { animation: none; }

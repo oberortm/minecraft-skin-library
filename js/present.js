@@ -241,6 +241,10 @@ async function show(i, dir = 0) {
 }
 
 // ---------- header + idle chrome ----------
+function closeHeader() {
+  clearTimeout(st.hdrTimer);
+  document.body.classList.remove("hdr-open");
+}
 function openHeader() {
   document.body.classList.add("hdr-open");
   clearTimeout(st.hdrTimer);
@@ -312,7 +316,7 @@ export function setupPresentation() {
   $("prPrev").addEventListener("click", () => show(st.i - 1, -1));
   $("prNext").addEventListener("click", () => show(st.i + 1, 1));
   $("prClose").addEventListener("click", stopPresentation);
-  $("prMenu").addEventListener("click", () => { document.body.classList.contains("hdr-open") ? document.body.classList.remove("hdr-open") : openHeader(); });
+  $("prMenu").addEventListener("click", () => { document.body.classList.contains("hdr-open") ? closeHeader() : openHeader(); });
   $("prRotate").addEventListener("click", () => applyRotate(!st.rotate));
   $("prFull").addEventListener("click", () => {
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
@@ -323,6 +327,11 @@ export function setupPresentation() {
   root.addEventListener("pointermove", wake);
   // touch screens send no hover moves: any tap brings the controls back
   root.addEventListener("pointerdown", wake, true);
+  $("hdrClose").addEventListener("click", closeHeader);
+  // a click anywhere outside the open header closes it
+  document.addEventListener("pointerdown", e => {
+    if (st.on && document.body.classList.contains("hdr-open") && !e.target.closest(".top, #prMenu")) closeHeader();
+  }, true);
   document.addEventListener("pointermove", e => { if (st.on && e.clientY < 10) openHeader(); });
   document.querySelector(".top").addEventListener("pointerenter", () => { if (st.on) clearTimeout(st.hdrTimer); });
   document.querySelector(".top").addEventListener("pointerleave", () => { if (st.on && document.body.classList.contains("hdr-open")) openHeader(); });
@@ -330,6 +339,7 @@ export function setupPresentation() {
     if (!st.on || e.target.matches("input, textarea, select") || document.querySelector("dialog[open]")) return;
     if (e.key === "ArrowRight") { e.preventDefault(); show(st.i + 1, 1); }
     else if (e.key === "ArrowLeft") { e.preventDefault(); show(st.i - 1, -1); }
+    else if (e.key === "Escape" && document.body.classList.contains("hdr-open")) closeHeader();
     else if (e.key === "Escape" && !document.fullscreenElement) stopPresentation();
     else if (e.key === " ") { e.preventDefault(); applyRotate(!st.rotate); }
     else if (/^[1-4]$/.test(e.key)) applyScene(SCENES[st.group][Number(e.key) - 1].id);
