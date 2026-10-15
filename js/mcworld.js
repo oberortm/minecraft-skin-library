@@ -171,6 +171,15 @@ const TEX = {
     if (x === 15 || y === 15) f *= 0.75;
     return shade(hex("#3a3541"), f);
   }),
+  // studio walls: almost plain, a faint large-tile pattern so the surface still reads
+  studioWhite: s => paint(s, (x, y, r) => {
+    const joint = x === 0 || y === 0;
+    return shade(hex("#f8f8f6"), (joint ? 0.972 : 1) * (0.99 + r() * 0.01));
+  }),
+  studioDark: s => paint(s, (x, y, r) => {
+    const joint = x === 0 || y === 0;
+    return shade(hex("#2d2a33"), (joint ? 0.8 : 1) * (0.94 + r() * 0.08));
+  }),
   panel: s => paint(s, (x, y, r) => {
     const edge = x === 0 || y === 0 || x === 15 || y === 15;
     return edge ? shade(hex("#d9d6cd"), 0.95 + r() * 0.05) : shade(hex("#fffaf0"), 0.97 + r() * 0.03);
@@ -240,6 +249,30 @@ function addBlockAO(m) {
       .replace("#include <aomap_fragment>", "#include <aomap_fragment>\n{ float bao = blockAO(); reflectedLight.indirectDiffuse *= bao; reflectedLight.directDiffuse *= mix(1.0, bao, 0.5); }");
   };
   m.customProgramCacheKey = () => "block-ao";
+}
+
+/** Standard material for the studio rooms, with soft darkening where floor, walls and ceiling meet. */
+function studioMaterial(params, room) {
+  const m = new THREE.MeshStandardMaterial({ metalness: 0, ...params });
+  m.onBeforeCompile = sh => {
+    sh.uniforms.roomHalf = { value: room.half }; sh.uniforms.roomFloor = { value: room.floorY }; sh.uniforms.roomCeil = { value: room.ceilY };
+    sh.vertexShader = sh.vertexShader
+      .replace("#include <common>", "#include <common>\nvarying vec3 vRoomPos;")
+      .replace("#include <worldpos_vertex>", "#include <worldpos_vertex>\nvRoomPos = (modelMatrix * vec4(transformed, 1.0)).xyz;");
+    sh.fragmentShader = sh.fragmentShader
+      .replace("#include <common>", `#include <common>
+        varying vec3 vRoomPos; uniform float roomHalf, roomFloor, roomCeil;
+        float roomAO() {
+          float d[6]; d[0] = roomHalf - vRoomPos.x; d[1] = roomHalf + vRoomPos.x; d[2] = roomHalf - vRoomPos.z;
+          d[3] = roomHalf + vRoomPos.z; d[4] = vRoomPos.y - roomFloor; d[5] = roomCeil - vRoomPos.y;
+          float ao = 1.0;
+          for (int i = 0; i < 6; i++) if (d[i] > 1.0) ao *= 1.0 - 0.32 * exp(-d[i] / 34.0);
+          return ao;
+        }`)
+      .replace("#include <aomap_fragment>", "#include <aomap_fragment>\n{ float rao = roomAO(); reflectedLight.indirectDiffuse *= rao; reflectedLight.directDiffuse *= mix(1.0, rao, 0.6); }");
+  };
+  m.customProgramCacheKey = () => "studio-ao";
+  return m;
 }
 
 /** Sky dome: gradient, square sun or moon, stars. Outputs linear HDR; the output pass tone-maps it. */
@@ -324,9 +357,9 @@ const sunAt = (azimuth, elevation) => new THREE.Vector3(
 
 const LOOKS = {
   "mc-white": {
-    set: "roomWhite", exposure: 0.95,
+    set: "roomWhite", exposure: 1.12,
     sky: { top: "#f4f5f7", horizon: "#ffffff", bottom: "#e9eaee", sun: sunAt(0.6, 1.0), sunColor: "#ffffff", sunSize: 0.0001, glow: 0 },
-    fog: ["#f3f3f1", 260, 900], hemi: ["#ffffff", "#d9d6cf", 1.15],
+    fog: ["#f6f6f4", 260, 900], hemi: ["#ffffff", "#e6e3dc", 1.35],
     key: { dir: sunAt(0.55, 1.3), color: "#fff6ea", intensity: 1.45 }, fill: 0.35,
     bloom: [0.22, 0.45, 0.9], player: [0.25, 0.3],
   },
@@ -591,34 +624,53 @@ export class McWorld {
   }
 
   /** A square room with a plinth in the middle; big enough that the orbiting camera stays inside. */
+  /**
+   * A seamless photo studio: smooth floor, walls and ceiling (no block joints), corners softened by an
+   * analytic occlusion term, a faint texture on the walls, a plinth for the figure. White: light panels
+   * in the ceiling. Dark: the same room, lit only by the cone from above.
+   */
   buildRoom(white) {
-    // the white room is a little taller and has a ceiling with light panels
-    const cells = [], R = 12, H = white ? 9 : 7;
-    const floorA = white ? "quartzTile" : "darkPolished", floorB = white ? "quartz" : "dark";
-    for (let x = -R; x <= R; x++) for (let z = -R; z <= R; z++) {
-      cells.push([(x + z) % 2 === 0 ? floorA : floorB, x, -1, z]);
-      const edge = Math.max(Math.abs(x), Math.abs(z));
-      if (edge === R) {
-        for (let y = 0; y < H; y++) {
-          let type = white ? "quartz" : "darkBrick";
-          const corner = Math.abs(x) === R && Math.abs(z) === R;
-          const pillar = corner || (Math.abs(x) % 4 === 0 && Math.abs(z) === R) || (Math.abs(z) % 4 === 0 && Math.abs(x) === R);
-          if (pillar) type = white ? "pillar" : "darkPolished";
-          cells.push([type, x, y, z]);
-        }
-      }
-    }
-    // plinth: the figure stands on a 3x3 platform one step above the floor
-    for (let x = -1; x <= 1; x++) for (let z = -1; z <= 1; z++) cells.push([white ? "pillar" : "darkPolished", x, 0, z]);
-    const g = this.buildBlocks(dedupe(cells), white ? 11 : 12);
+    const g = new THREE.Group();
+    const half = 12 * B, floorY = FEET - B, ceilY = floorY + (white ? 10 : 8) * B;
+    const room = { half, floorY, ceilY };
+    const wallTex = new THREE.CanvasTexture(TEX[white ? "studioWhite" : "studioDark"](white ? 41 : 42));
+    wallTex.wrapS = wallTex.wrapT = THREE.RepeatWrapping;
+    wallTex.magFilter = THREE.NearestFilter; wallTex.colorSpace = THREE.SRGBColorSpace;
+    wallTex.repeat.set(12, (ceilY - floorY) / (B * 2));
+    const base = white ? "#f4f4f2" : "#2a272f";
+    const floorMat = studioMaterial({ color: white ? "#f6f6f4" : "#35313b", roughness: white ? 0.85 : 0.55 }, room);
+    const wallMat = studioMaterial({ color: base, map: wallTex, roughness: 0.95 }, room);
+    const ceilMat = studioMaterial({ color: white ? "#fbfbfa" : "#141218", roughness: 1 }, room);
+    const plane = (w, h, mat, pos, rot) => {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
+      m.position.set(...pos); m.rotation.set(...rot); m.receiveShadow = true;
+      this.disposables.push(m.geometry);
+      g.add(m); return m;
+    };
+    const span = half * 2, height = ceilY - floorY, mid = (floorY + ceilY) / 2;
+    plane(span, span, floorMat, [0, floorY, 0], [-Math.PI / 2, 0, 0]);
+    plane(span, span, ceilMat, [0, ceilY, 0], [Math.PI / 2, 0, 0]);
+    plane(span, height, wallMat, [0, mid, -half], [0, 0, 0]);
+    plane(span, height, wallMat, [0, mid, half], [0, Math.PI, 0]);
+    plane(span, height, wallMat, [-half, mid, 0], [0, Math.PI / 2, 0]);
+    plane(span, height, wallMat, [half, mid, 0], [0, -Math.PI / 2, 0]);
+    // plinth: the figure stands one block above the floor
+    const plinthGeo = new THREE.BoxGeometry(3 * B, B, 3 * B);
+    const plinth = new THREE.Mesh(plinthGeo, studioMaterial({ color: white ? "#ffffff" : "#3c3843", roughness: white ? 0.7 : 0.45 }, room));
+    plinth.position.set(0, FEET - B / 2, 0); plinth.castShadow = plinth.receiveShadow = true;
+    g.add(plinth);
+    this.disposables.push(plinthGeo, wallTex, floorMat, wallMat, ceilMat, plinth.material);
     if (white) {
-      const ceiling = [];
-      for (let x = -R; x <= R; x++) for (let z = -R; z <= R; z++) {
-        const lit = Math.abs(x) <= R - 2 && Math.abs(z) <= R - 2 && ((x + 64) % 4) < 2 && ((z + 64) % 4) < 2;
-        ceiling.push([lit ? "panel" : "quartz", x, H, z]);
-      }
-      // the ceiling does not cast shadows, so the soft key light from above still reaches the floor
-      g.add(this.buildBlocks(ceiling, 13, { shadows: false }));
+      // light panels in the ceiling, slightly below it so they glow (and bloom on high quality)
+      const panelGeo = new THREE.BoxGeometry(2 * B, 1, 2 * B), panelMat = new THREE.MeshStandardMaterial({ color: "#ffffff", emissive: "#fff6e8", emissiveIntensity: 1.6 });
+      const spots = [];
+      for (let x = -2; x <= 2; x++) for (let z = -2; z <= 2; z++) spots.push([x * 4 * B, z * 4 * B]);
+      const panels = new THREE.InstancedMesh(panelGeo, panelMat, spots.length);
+      const m4 = new THREE.Matrix4();
+      spots.forEach(([x, z], i) => panels.setMatrixAt(i, m4.makeTranslation(x, ceilY - 0.6, z)));
+      panels.frustumCulled = false;
+      g.add(panels);
+      this.disposables.push(panelGeo, panelMat);
     }
     return g;
   }
