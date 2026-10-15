@@ -319,6 +319,15 @@ export function setupPresentation() {
   $("prClose").addEventListener("click", stopPresentation);
   $("prMenu").addEventListener("click", () => { document.body.classList.contains("hdr-open") ? closeHeader() : openHeader(); });
   $("prRotate").addEventListener("click", () => applyRotate(!st.rotate));
+  // the button shows what it will do: enter or leave full screen (also after Esc / F11)
+  const syncFull = () => {
+    const full = !!document.fullscreenElement, b = $("prFull");
+    b.querySelector("use").setAttribute("href", full ? "#i-full-exit" : "#i-full");
+    b.dataset.i18nTitle = full ? "fullscreenExit" : "fullscreen";
+    b.title = t(b.dataset.i18nTitle); b.setAttribute("aria-label", b.title);
+    b.setAttribute("aria-pressed", String(full));
+  };
+  document.addEventListener("fullscreenchange", syncFull);
   $("prFull").addEventListener("click", () => {
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
     else document.documentElement.requestFullscreen?.().catch(() => {});

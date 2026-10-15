@@ -4,15 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Skin Library</title>
-<meta name="app-version" content="22">
+<meta name="app-version" content="23">
 <meta name="description" content="Personal Minecraft skin library in your browser: collect skins, view them in 3D and draw your own. Everything stays local.">
-<link rel="icon" href="icon.svg?v=22" type="image/svg+xml">
+<link rel="icon" href="icon.svg?v=23" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="css/style.css?v=22">
-<link rel="stylesheet" href="css/looks.css?v=22">
-<link rel="stylesheet" href="css/present.css?v=22">
+<link rel="stylesheet" href="css/style.css?v=23">
+<link rel="stylesheet" href="css/looks.css?v=23">
+<link rel="stylesheet" href="css/present.css?v=23">
 <script>
   // apply the saved theme before first paint; Studio is the only look
   (function () {
@@ -33,6 +33,7 @@
   <symbol id="i-play" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 8.5v5l4.5-2.5z" fill="currentColor"/><path d="M8 21h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
   <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
   <symbol id="i-full" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-full-exit" viewBox="0 0 24 24"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-rotate" viewBox="0 0 24 24"><path d="M20 12a8 8 0 11-2.3-5.6M20 4v4h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/></symbol>
   <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.8l-5.2 2.8 1-5.8-4.3-4.1 5.9-.8z" fill="currentColor"/></symbol>
@@ -284,25 +285,25 @@
 
 <!--
   Cache busting: every CSS/JS URL carries ?v=N. The import map below gives every module exactly one
-  versioned URL, so "./app.js" and "./app.js?v=22" never become two module instances.
+  versioned URL, so "./app.js" and "./app.js?v=23" never become two module instances.
   Raise the number everywhere in this file for each release (see README).
   Vendored libraries carry their version in the folder name instead (vendor/three@0.156.1/ ...).
 -->
 <script type="importmap">
 {
   "imports": {
-    "./js/app.js": "./js/app.js?v=22",
-    "./js/db.js": "./js/db.js?v=22",
-    "./js/dom.js": "./js/dom.js?v=22",
-    "./js/editor.js": "./js/editor.js?v=22",
-    "./js/fig3d.js": "./js/fig3d.js?v=22",
-    "./js/i18n.js": "./js/i18n.js?v=22",
-    "./js/motion.js": "./js/motion.js?v=22",
-    "./js/present.js": "./js/present.js?v=22",
-    "./js/skin.js": "./js/skin.js?v=22",
-    "./js/view3d.js": "./js/view3d.js?v=22",
-    "./js/paint3d.js": "./js/paint3d.js?v=22",
-    "./js/mcworld.js": "./js/mcworld.js?v=22",
+    "./js/app.js": "./js/app.js?v=23",
+    "./js/db.js": "./js/db.js?v=23",
+    "./js/dom.js": "./js/dom.js?v=23",
+    "./js/editor.js": "./js/editor.js?v=23",
+    "./js/fig3d.js": "./js/fig3d.js?v=23",
+    "./js/i18n.js": "./js/i18n.js?v=23",
+    "./js/motion.js": "./js/motion.js?v=23",
+    "./js/present.js": "./js/present.js?v=23",
+    "./js/skin.js": "./js/skin.js?v=23",
+    "./js/view3d.js": "./js/view3d.js?v=23",
+    "./js/paint3d.js": "./js/paint3d.js?v=23",
+    "./js/mcworld.js": "./js/mcworld.js?v=23",
     "skinview3d": "./vendor/skinview3d@3.0.1/skinview3d.js",
     "skinview-utils": "./vendor/skinview-utils@0.7.1/index.js",
     "three": "./vendor/three@0.156.1/three.module.min.js",
@@ -327,6 +328,6 @@
     }, 4000);
   });
 </script>
-<script type="module" src="js/app.js?v=22"></script>
+<script type="module" src="js/app.js?v=23"></script>
 </body>
 </html>
