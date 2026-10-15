@@ -537,8 +537,9 @@ export class McWorld {
   player(on) {
     const v = this.viewer;
     v.playerObject.traverse(o => { if (o.isMesh) { o.castShadow = on; o.receiveShadow = false; } });
-    const t = v.skinTexture;
-    if (t) { t.colorSpace = on ? THREE.SRGBColorSpace : THREE.NoColorSpace; t.needsUpdate = true; }
+    for (const t of [v.skinTexture, v.capeTexture]) {
+      if (t) { t.colorSpace = on ? THREE.SRGBColorSpace : THREE.NoColorSpace; t.needsUpdate = true; }
+    }
   }
   /** Call after every loadSkin: skinview3d creates a new texture each time. */
   skinChanged() { this.player(true); }

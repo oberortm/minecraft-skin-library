@@ -189,6 +189,10 @@ body.hdr-open .pr-menu { background: var(--pr-ui-on); color: var(--pr-ui-on-fg);
   background: color-mix(in srgb, var(--pr-ui-on-fg) 90%, transparent); border: 1px solid var(--pr-ui-line); color: var(--pr-fg);
   backdrop-filter: blur(18px) saturate(1.4); box-shadow: 0 18px 50px rgba(0,0,0,.25);
 }
+.pr-panel { max-height: calc(100dvh - 190px); overflow: auto; overscroll-behavior: contain; }
+.pr-check { display: flex; gap: 8px; align-items: center; font: 600 13px var(--f-body); cursor: pointer; }
+.pr-check input { accent-color: var(--pr-ui-on); width: 16px; height: 16px; }
+#prEquip[aria-expanded="true"] { background: var(--pr-ui-on); color: var(--pr-ui-on-fg); }
 .pr-panel h3 { margin: 0; font: 600 14px var(--f-body); color: var(--pr-fg); text-transform: none; letter-spacing: 0; }
 .pr-panel-row { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
 .pr-panel-label { font: 500 13px var(--f-body); color: var(--pr-muted); }

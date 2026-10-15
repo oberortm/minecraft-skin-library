@@ -24,6 +24,8 @@ const FILES = {
   dark: [["block/blackstone", "block/deepslate", "blocks/stone_andesite"]],
   darkBrick: [["block/polished_blackstone_bricks", "block/deepslate_bricks", "blocks/stonebrick"]],
   darkPolished: [["block/polished_blackstone", "block/polished_deepslate", "blocks/stone_andesite_smooth"]],
+  // equipment for the presentation figure
+  elytra: [["entity/equipment/wings/elytra", "entity/elytra"]],
 };
 
 // ---------- tiny zip reader (stored + deflate), enough for resource packs ----------

@@ -3,6 +3,7 @@ import { t, applyI18n } from "./i18n.js";
 
 import { $ } from "./dom.js";
 import { load3d } from "./view3d.js";
+import { loadEquipment, saveEquipment, applyElytra } from "./equipment.js";
 import { readPack, packCanvases, savePack, loadPack, SOURCES, downloadSource, selectedSource, selectSource } from "./pack.js";
 const KEY = "skin-library-present";
 const QUALITY_KEY = "skin-library-mc-quality";
@@ -31,6 +32,7 @@ const st = {
   fx: { raf: 0, parts: [], mode: null }, idleTimer: 0, hdrTimer: 0, busy: false, onExit: null,
   // "reduce motion" in the system: start still, but a click on a motion button always wins
   motion: true,
+  equip: loadEquipment(), packTex: null,
 };
 
 function prefs() {
@@ -135,13 +137,44 @@ function dropWorld() {
   st.world = null;
 }
 
+// ---------- equipment ----------
+async function applyEquipment() {
+  const v = st.viewer;
+  if (!v) return;
+  try { await applyElytra(v, st.equip.elytra, st.packTex); } catch (e) { console.error("[skin-library] equipment failed:", e); }
+  if (st.world) st.world.skinChanged();
+}
+function syncEquipUi() {
+  $("eqElytra").checked = !!st.equip.elytra;
+}
+function setElytra(on) {
+  st.equip.elytra = on;
+  saveEquipment(st.equip);
+  syncEquipUi();
+  if (!on && st.anim === "fly") applyAnim("idle", true);
+  applyEquipment();
+}
+function toggleEquipPanel(open = $("prEquipPanel").hidden) {
+  if (open) togglePanel(false);
+  $("prEquipPanel").hidden = !open;
+  $("prEquip").setAttribute("aria-expanded", String(open));
+  if (open) syncEquipUi();
+}
+/** Textures of the selected source, for the equipment (also when no block world is shown). */
+async function loadPackTextures() {
+  const id = await selectedSource();
+  const pack = id === "builtin" ? null : await loadPack(id);
+  st.packTex = pack ? await packCanvases(pack) : null;
+  return st.packTex;
+}
+
 // ---------- texture source: built-in (default), Minecraft, three packs, own file ----------
 async function applySavedPack() {
   const id = await selectedSource();
   syncPackUi(id);
-  if (id === "builtin" || !st.world) return;
-  const pack = await loadPack(id);
-  if (pack && st.world) st.world.setPack(await packCanvases(pack));
+  const tex = await loadPackTextures();
+  if (st.world) st.world.setPack(tex);
+  applyEquipment();
 }
 function setHint(text, err = false, link = null) {
   const hint = $("prPackHint");
@@ -173,7 +206,7 @@ async function chooseSource(id) {
   st.packSeq = (st.packSeq || 0) + 1;
   const prev = await selectedSource();
   if (id === "builtin") {
-    selectSource("builtin"); if (st.world) st.world.setPack(null); syncPackUi("builtin"); return;
+    selectSource("builtin"); st.packTex = null; if (st.world) st.world.setPack(null); applyEquipment(); syncPackUi("builtin"); return;
   }
   let pack = await loadPack(id);
   if (!pack) {
@@ -191,7 +224,9 @@ async function chooseSource(id) {
     progress(null); $("prTexSource").disabled = false;
   }
   selectSource(id);
-  if (st.world) st.world.setPack(await packCanvases(pack));
+  st.packTex = await packCanvases(pack);
+  if (st.world) st.world.setPack(st.packTex);
+  applyEquipment();
   syncPackUi(id);
   setHint(t("texLoaded", { name: pack.name }));
 }
@@ -202,7 +237,9 @@ async function choosePack(file) {
     const pack = await readPack(file);
     await savePack("file", pack);
     selectSource("file");
-    if (st.world) st.world.setPack(await packCanvases(pack));
+    st.packTex = await packCanvases(pack);
+    if (st.world) st.world.setPack(st.packTex);
+    applyEquipment();
     syncPackUi("file", pack);
   } catch (e) {
     // a wrong or empty file is a normal user mistake: explain it in the panel, no console noise
@@ -211,6 +248,7 @@ async function choosePack(file) {
   }
 }
 function togglePanel(open = $("prWorldPanel").hidden) {
+  if (open) toggleEquipPanel(false);
   $("prWorldPanel").hidden = !open;
   $("prWorld").setAttribute("aria-expanded", String(open));
   if (open) {
@@ -235,6 +273,8 @@ function toggleGroup() {
 }
 
 function applyAnim(id, byUser = false) {
+  // flying needs an elytra, like in the game
+  if (id === "fly" && byUser && !st.equip.elytra) setElytra(true);
   st.anim = id;
   if (byUser) st.motion = true;
   // buttons only look pressed when they really do something
@@ -356,6 +396,7 @@ async function show(i, dir = 0) {
   if (st.viewer) {
     try { await st.viewer.loadSkin(skin.data, { model: skin.model === "slim" ? "slim" : "default" }); } catch (e) { /* ignore */ }
     st.viewer.playerObject.rotation.y = 0;
+    await applyEquipment();
     if (st.world) st.world.skinChanged();
   }
   root.classList.remove("pr-leave");
@@ -417,6 +458,8 @@ export async function startPresentation(list, startIndex = 0, onExit) {
   if (!st.on) return;
   $("prFallback").hidden = !!st.viewer;
   if (st.viewer) st.viewer.renderPaused = false;
+  st.equip = loadEquipment();
+  loadPackTextures().then(applyEquipment);
   applyScene(st.scene);
   applyAnim(st.anim);
   applyRotate(st.rotate);
@@ -480,6 +523,11 @@ export function setupPresentation() {
   root.addEventListener("pointerdown", wake, true);
   $("hdrClose").addEventListener("click", closeHeader);
   $("prWorld").addEventListener("click", () => togglePanel());
+  $("prEquip").addEventListener("click", () => toggleEquipPanel());
+  $("eqElytra").addEventListener("change", e => setElytra(e.target.checked));
+  document.addEventListener("pointerdown", e => {
+    if (!$("prEquipPanel").hidden && !e.target.closest("#prEquipPanel, #prEquip")) toggleEquipPanel(false);
+  }, true);
   $("prHideUi").addEventListener("click", e => { e.stopPropagation(); hideUi(); });
   // after hiding, a clear mouse movement (not the click jitter) or a tap brings the controls back
   root.addEventListener("pointermove", e => {
@@ -520,6 +568,7 @@ export function setupPresentation() {
     if (e.key === "ArrowRight") { e.preventDefault(); show(st.i + 1, 1); }
     else if (e.key === "ArrowLeft") { e.preventDefault(); show(st.i - 1, -1); }
     else if (e.key === "Escape" && !$("prWorldPanel").hidden) togglePanel(false);
+    else if (e.key === "Escape" && !$("prEquipPanel").hidden) toggleEquipPanel(false);
     else if (e.key === "Escape" && document.body.classList.contains("hdr-open")) closeHeader();
     else if (e.key === "Escape" && !document.fullscreenElement) stopPresentation();
     else if (e.key === " ") { e.preventDefault(); applyRotate(!st.rotate); }
