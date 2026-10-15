@@ -85,6 +85,10 @@ sed -i "s/?v=$ALT\"/?v=$NEU\"/g; s/app-version\" content=\"$ALT\"/app-version\" 
 
 Neue Module in `js/` müssen zusätzlich in der Import-Map in `index.html` eingetragen werden. Die Bibliotheken in `vendor/` tragen ihre Version im Ordnernamen; skinview3d und der eigene Code holen sich `three` über dieselbe Import-Map-Zeile, damit nie zwei three.js-Kopien geladen werden. Startet ein Teil der App nicht (fehlendes Element, Fehler), laufen die anderen Knöpfe weiter und es erscheint ein Hinweis statt einer toten Seite.
 
+### Performance-Optimierung zurücknehmen
+
+Die Optimierungen (WebGL höchstens 2× Pixeldichte, wiederverwendete Raster-Figuren, `modulepreload`) stecken in **einem** Commit (`c6e75f0`, Stand davor: lokaler Tag `vor-performance`). Zurücknehmen: `git revert c6e75f0`, danach wie oben die Versionsnummer erhöhen.
+
 ## Aufbau
 
 ```
@@ -129,6 +133,6 @@ A personal Minecraft skin library that runs entirely in your browser. Drop in PN
 
 The presentation mode has two scene groups: Classic backdrops, and Minecraft-style 3D block worlds (white room, dark stage, sunrise island, moonlit night) with real-time shadows, ACES tone mapping, fog, bloom, light shafts, reflective water and soft ambient occlusion. All built-in block textures are generated in code; you can optionally load your own resource pack (.zip), which stays in your browser. A High/Low quality switch keeps it smooth on phones. The "Equipment" button dresses the figure: an elytra (needed for flying) and armor per piece (leather with any dye, chainmail, iron, gold, copper, diamond, netherite) with armor trims and enchantment glint, plus items in the main and off hand (swords, axes, pickaxes and spears in all materials, mace, trident, bow, crossbow, a 3D shield, totem, torch, map), all drawn in code or taken from the selected texture source. Light/dark and English/German toggles are in the header.
 
-No build step: serve the folder with any static server. Every CSS/JS URL carries a version (`?v=N`, set in `index.html`); raise it on each release so browsers never mix cached old and new files.
+No build step: serve the folder with any static server. Every CSS/JS URL carries a version (`?v=N`, set in `index.html`); raise it on each release so browsers never mix cached old and new files. The performance tweaks (pixel ratio capped at 2, reused grid figures, module preloading) live in a single commit, `c6e75f0`, so `git revert` undoes them.
 
 Not an official Minecraft product. Not approved by or associated with Mojang or Microsoft.
