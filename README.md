@@ -14,8 +14,8 @@ Persönliche Minecraft-Skin-Bibliothek im Browser: Skins per Drag & Drop sammeln
 - **Editor:** Direkt auf die Textur oder auf die Vorder- und Rückseite der Figur malen. Stift, Radierer, Füllen (bleibt in der jeweiligen Fläche), Pipette, Basis- und Außen-Ebene, Slim/Classic, Rückgängig und Wiederholen, Live-3D-Vorschau. Neuer Skin startet auf einer neutralen Vorlage.
 - **Export:** Jeder Skin als PNG, dazu ein Hinweis, welches Spielermodell du im Launcher wählen musst.
 - **Backup:** Die ganze Bibliothek als JSON-Datei speichern und auf einem anderen Gerät wieder laden.
-- **5 Looks**, jeweils hell und dunkel: Standard, Studio und Prism (beide mit 3D-Figuren und Scroll-Animationen), Minecraft (vor einer generierten Pixel-Landschaft) und Exhibition.
-- Englisch (Standard) und Deutsch.
+- **Präsentationsmodus:** Ein Skin bildschirmfüllend in 3D, mit Pfeilen, Tastatur (← →) oder Wischen weiterblättern. Fünf Szenen mit eigener Beleuchtung (Studio, Spotlight, Golden hour, Neon, Moonlight), Animationen (Stehen, Gehen, Rennen, Fliegen), Drehen, Vollbild. Das Menü versteckt sich und kommt über den Menü-Button oben links zurück.
+- **Oberfläche:** Ein klarer Look mit 3D-Figuren in den Karten, Hell/Dunkel und Englisch/Deutsch per Knopfdruck im Header.
 
 ### Tastenkürzel im Editor
 
@@ -27,6 +27,16 @@ Persönliche Minecraft-Skin-Bibliothek im Browser: Skins per Drag & Drop sammeln
 | `I` | Pipette |
 | `Strg`/`Cmd` + `Z` | Rückgängig |
 | `Strg`/`Cmd` + `Y` oder `Shift` + `Z` | Wiederholen |
+
+### Tastenkürzel in der Präsentation
+
+| Taste | Aktion |
+| --- | --- |
+| `←` / `→` | Vorheriger / nächster Skin |
+| `Leertaste` | Drehen an/aus |
+| `1`–`5` | Szene wählen |
+| `M` | Menü einblenden |
+| `Esc` | Präsentation beenden |
 
 ## Datenschutz
 
@@ -48,15 +58,15 @@ Dann http://localhost:8000 öffnen.
 
 ```
 index.html          Seite, Dialoge
-css/style.css       Grundlayout und Standard-Look
-css/looks.css       Die anderen Looks (je hell und dunkel)
+css/style.css       Grundlayout
+css/looks.css       Studio-Look (hell und dunkel)
+css/present.css     Präsentationsmodus und Szenen
 js/app.js           Bibliothek, Import, Detailansicht, Backup
 js/editor.js        Skin-Editor
 js/skin.js          Skin-Geometrie, Rendering, Formatumwandlung
-js/fig3d.js         3D-Figuren aus CSS-Boxen (ohne WebGL, für die 3D-Looks)
-js/motion.js        Scroll-Fly-ins, Tilt, Titel-Animation
-js/mcscene.js       Generierte Pixel-Landschaft für den Minecraft-Look
-js/looks.js         Look-Umschaltung
+js/fig3d.js         3D-Figuren aus CSS-Boxen für die Karten (ohne WebGL)
+js/motion.js        Einblenden beim Scrollen, Titel-Animation
+js/present.js       Präsentationsmodus
 js/db.js            Speicher (IndexedDB)
 js/i18n.js          Texte auf Deutsch und Englisch
 vendor/skinview3d   3D-Ansicht (MIT-Lizenz)
@@ -72,12 +82,12 @@ vendor/skinview3d   3D-Ansicht (MIT-Lizenz)
 
 MIT, siehe [LICENSE](LICENSE). Die 3D-Ansicht nutzt [skinview3d](https://github.com/bs-community/skinview3d) (MIT).
 
-Dieses Projekt ist nicht offiziell und steht in keiner Verbindung zu Mojang oder Microsoft. „Minecraft“ ist eine Marke von Mojang Synergies AB. Es werden keine Grafiken oder Schriften aus dem Spiel verwendet; die Landschaft im Minecraft-Look wird zufällig generiert.
+Dieses Projekt ist nicht offiziell und steht in keiner Verbindung zu Mojang oder Microsoft. „Minecraft“ ist eine Marke von Mojang Synergies AB. Es werden keine Grafiken oder Schriften aus dem Spiel verwendet.
 
 ---
 
 ## English
 
-A personal Minecraft skin library that runs entirely in your browser. Drop in PNG skins (64×64 or legacy 64×32), browse them front, back or as a texture, view them in 3D, draw your own in the built-in editor and export them as PNG. Everything is stored locally in IndexedDB; use the backup file to move your library to another device. Five looks (Standard, Studio, Prism, Minecraft, Exhibition), each with light and dark mode. No build step: serve the folder with any static server.
+A personal Minecraft skin library that runs entirely in your browser. Drop in PNG skins (64×64 or legacy 64×32), browse them front, back or as a texture, view them in 3D, draw your own in the built-in editor and export them as PNG. Everything is stored locally in IndexedDB; use the backup file to move your library to another device. Includes a full-screen presentation mode with lit scenes and animations, plus light/dark and English/German toggles. No build step: serve the folder with any static server.
 
 Not an official Minecraft product. Not approved by or associated with Mojang or Microsoft.

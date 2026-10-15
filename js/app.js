@@ -2,7 +2,7 @@ import { t, applyI18n, setLang, getLang } from "./i18n.js";
 import { db, newId, askPersist } from "./db.js";
 import { renderFigure, detectModel, loadImage, REGIONS } from "./skin.js";
 import { openEditor, editorOpen } from "./editor.js";
-import { applyLook, savedLook, currentLook, LOOKS_3D, LOOKS_MOTION } from "./looks.js";
+import { startPresentation, stopPresentation, presenting, setupPresentation } from "./present.js";
 import { buildFigure } from "./fig3d.js";
 import { reveal, bindTilt, trackScroll, splitTitle } from "./motion.js";
 
@@ -86,10 +86,10 @@ function renderGrid() {
   const n = state.skins.length;
   $("emptyState").hidden = n > 0;
   $("toolbar").hidden = n === 0;
+  $("presentBtn").disabled = list.length === 0;
   $("noMatch").hidden = !(n > 0 && list.length === 0);
   $("countLabel").textContent = n === 0 ? "" : list.length === n ? (n === 1 ? t("countOne") : t("countMany", { n })) : t("countFiltered", { shown: list.length, n });
-  const look = currentLook();
-  const is3d = LOOKS_3D.includes(look) && state.view !== "tex";
+  const is3d = state.view !== "tex";
   const cards = list.map(skin => {
     const b = document.createElement("button");
     b.className = "card";
@@ -114,7 +114,7 @@ function renderGrid() {
     return b;
   });
   grid.replaceChildren(...cards);
-  if (LOOKS_MOTION.includes(look)) reveal(cards);
+  reveal(cards);
 }
 
 // ---------- import ----------
@@ -385,11 +385,27 @@ function startEditor(skin) {
 }
 
 // ---------- settings ----------
-function applyTheme(v) {
-  if (v === "light" || v === "dark") document.documentElement.dataset.theme = v;
-  else delete document.documentElement.dataset.theme;
+const isDark = () => {
+  const th = document.documentElement.dataset.theme;
+  return th ? th === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+};
+function syncThemeBtn() {
+  $("themeBtn").querySelector("use").setAttribute("href", isDark() ? "#i-sun" : "#i-moon");
+}
+function toggleTheme() {
+  const v = isDark() ? "light" : "dark";
+  document.documentElement.dataset.theme = v;
   try { localStorage.setItem("skin-library-theme", v); } catch (e) { /* ignore */ }
+  syncThemeBtn();
   if ($("detail").open && state.current) openDetail(state.current);
+}
+function syncLangBtn() { $("langBtn").textContent = getLang().toUpperCase(); }
+function present(startId) {
+  const list = visibleSkins();
+  if (!list.length) return;
+  const i = Math.max(0, list.findIndex(s => s.id === startId));
+  if ($("detail").open) $("detail").close();
+  startPresentation(list, i, () => renderGrid());
 }
 
 function drawEmptyFigure() {
@@ -398,13 +414,7 @@ function drawEmptyFigure() {
 }
 
 // ---------- boot ----------
-function syncLooks() {
-  const cur = document.documentElement.dataset.look;
-  document.querySelectorAll(".look-opt").forEach(b => b.setAttribute("aria-checked", String(b.dataset.look === cur)));
-}
-
 async function boot() {
-  applyLook(savedLook());
   splitTitle(document.querySelector(".top h1"));
   trackScroll();
   loadUi();
@@ -414,21 +424,21 @@ async function boot() {
   $("sortSelect").value = state.sort;
   $("sortSelect").addEventListener("change", e => { state.sort = e.target.value; saveUi(); renderGrid(); });
   $("searchInput").addEventListener("input", e => { state.search = e.target.value; renderGrid(); });
-  seg("langSeg", getLang(), v => { setLang(v); renderGrid(); if ($("detail").open && state.current) openDetail(state.current); });
-  let theme = "system";
-  try { theme = localStorage.getItem("skin-library-theme") || "system"; } catch (e) { /* ignore */ }
-  seg("themeSeg", theme, applyTheme);
+  syncThemeBtn(); syncLangBtn();
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", syncThemeBtn);
+  $("themeBtn").addEventListener("click", toggleTheme);
+  $("langBtn").addEventListener("click", () => {
+    setLang(getLang() === "en" ? "de" : "en"); syncLangBtn(); renderGrid();
+    if ($("detail").open && state.current) openDetail(state.current);
+  });
+  $("presentBtn").addEventListener("click", () => presenting() ? stopPresentation() : present(null));
+  $("dPresent").addEventListener("click", () => present(state.current));
   $("newBtn").addEventListener("click", () => startEditor(null));
   $("emptyNewBtn").addEventListener("click", () => startEditor(null));
-  $("settingsBtn").addEventListener("click", () => { syncLooks(); $("settings").showModal(); });
-  $("sClose").addEventListener("click", () => $("settings").close());
-  $("settings").addEventListener("click", e => { if (e.target === $("settings")) $("settings").close(); });
-  $("lookList").addEventListener("click", e => {
-    const b = e.target.closest(".look-opt"); if (!b) return;
-    applyLook(b.dataset.look); syncLooks(); renderGrid();
-  });
-  $("backupExportBtn").addEventListener("click", exportBackup);
-  $("backupImportBtn").addEventListener("click", () => $("backupInput").click());
+  document.addEventListener("click", e => { if (!e.target.closest("#moreMenu")) $("moreMenu").open = false; });
+  setupPresentation();
+  $("backupExportBtn").addEventListener("click", () => { $("moreMenu").open = false; exportBackup(); });
+  $("backupImportBtn").addEventListener("click", () => { $("moreMenu").open = false; $("backupInput").click(); });
   $("backupInput").addEventListener("change", e => { const f = e.target.files[0]; if (f) importBackup(f); e.target.value = ""; });
   setupDrop();
   setupDetail();

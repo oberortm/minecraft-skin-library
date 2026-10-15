@@ -5,20 +5,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Skin Library</title>
 <meta name="description" content="Personal Minecraft skin library in your browser: collect skins, view them in 3D and draw your own. Everything stays local.">
-<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="icon.svg?v=3" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="css/style.css">
 <link rel="stylesheet" href="css/looks.css">
+<link rel="stylesheet" href="css/present.css">
 <script>
-  // apply the saved look and theme before first paint
+  // apply the saved theme before first paint; Studio is the only look
   (function () {
-    var d = document.documentElement, look = "standard", ok = ["standard", "mc", "gallery", "prism", "studio"];
-    try {
-      var th = localStorage.getItem("skin-library-theme"); if (th === "light" || th === "dark") d.dataset.theme = th;
-      var l = localStorage.getItem("skin-library-look"); if (ok.indexOf(l) > -1) look = l;
-    } catch (e) {}
-    d.dataset.look = look;
+    var d = document.documentElement;
+    d.dataset.look = "studio";
+    try { var th = localStorage.getItem("skin-library-theme"); if (th === "light" || th === "dark") d.dataset.theme = th; } catch (e) {}
   })();
 </script>
 </head>
@@ -28,6 +27,12 @@
   <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v4h16v-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
   <symbol id="i-gear" viewBox="0 0 24 24"><path d="M10 3h4l.6 2.6 2.2 1.3 2.6-.8 2 3.4-2 1.9v2.6l2 1.9-2 3.4-2.6-.8-2.2 1.3L14 21h-4l-.6-2.6-2.2-1.3-2.6.8-2-3.4 2-1.9v-2.6l-2-1.9 2-3.4 2.6.8 2.2-1.3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2.5v2.2M12 19.3v2.2M4.6 4.6l1.6 1.6M17.8 17.8l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.6 19.4l1.6-1.6M17.8 6.2l1.6-1.6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 019.5 4a8 8 0 1010.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 8.5v5l4.5-2.5z" fill="currentColor"/><path d="M8 21h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-full" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-rotate" viewBox="0 0 24 24"><path d="M20 12a8 8 0 11-2.3-5.6M20 4v4h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/></symbol>
   <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.8l-5.2 2.8 1-5.8-4.3-4.1 5.9-.8z" fill="currentColor"/></symbol>
   <symbol id="i-star-o" viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.8l-5.2 2.8 1-5.8-4.3-4.1 5.9-.8z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
@@ -58,7 +63,17 @@
     <div class="top-actions">
       <button class="btn primary" id="importBtn"><svg class="ic"><use href="#i-upload"/></svg><span data-i18n="import"></span></button>
       <button class="btn" id="newBtn"><svg class="ic"><use href="#i-plus"/></svg><span data-i18n="newSkin"></span></button>
-      <button class="btn icon-only" id="settingsBtn" data-i18n-title="settings"><svg class="ic"><use href="#i-gear"/></svg></button>
+      <button class="btn" id="presentBtn" aria-pressed="false"><svg class="ic"><use href="#i-play"/></svg><span data-i18n="present"></span></button>
+      <button class="btn icon-only" id="themeBtn" data-i18n-title="toggleTheme"><svg class="ic"><use href="#i-moon"/></svg></button>
+      <button class="btn lang" id="langBtn" data-i18n-title="toggleLang">EN</button>
+      <details class="menu" id="moreMenu">
+        <summary class="btn icon-only" data-i18n-title="more"><svg class="ic"><use href="#i-more"/></svg></summary>
+        <div class="menu-pop">
+          <button class="menu-item" id="backupExportBtn" data-i18n="backupExport"></button>
+          <button class="menu-item" id="backupImportBtn" data-i18n="backupImport"></button>
+          <p class="menu-note" data-i18n="storageText"></p>
+        </div>
+      </details>
     </div>
   </header>
 
@@ -93,47 +108,39 @@
   </footer>
 </div>
 
+<!-- Presentation -->
+<section id="present" class="present" data-scene="studio" hidden aria-label="Presentation">
+  <div class="pr-bg" aria-hidden="true"><i class="pr-sun"></i><i class="pr-moon"></i><i class="pr-beam"></i><i class="pr-grid"></i></div>
+  <canvas class="pr-fx" id="prFx" aria-hidden="true"></canvas>
+  <div class="pr-big" id="prBig" aria-hidden="true"></div>
+  <div class="pr-floor" aria-hidden="true"></div>
+  <div class="pr-stage" id="prStage"><div class="fallback" id="prFallback" hidden>3D unavailable</div></div>
+  <div class="pr-flash" aria-hidden="true"></div>
+  <button class="pr-icon pr-menu" id="prMenu" data-i18n-title="showHeader"><svg class="ic"><use href="#i-menu"/></svg></button>
+  <div class="pr-corner">
+    <button class="pr-icon" id="prFull" data-i18n-title="fullscreen"><svg class="ic"><use href="#i-full"/></svg></button>
+    <button class="pr-icon" id="prClose" data-i18n-title="presentExit"><svg class="ic"><use href="#i-x"/></svg></button>
+  </div>
+  <button class="pr-nav prev" id="prPrev" data-i18n-title="prev"><svg class="ic"><use href="#i-left"/></svg></button>
+  <button class="pr-nav next" id="prNext" data-i18n-title="next"><svg class="ic"><use href="#i-right"/></svg></button>
+  <div class="pr-info">
+    <div class="pr-count" id="prCount"></div>
+    <h2 class="pr-name" id="prName"></h2>
+    <div class="pr-meta" id="prMeta"></div>
+  </div>
+  <div class="pr-controls">
+    <div class="pr-row" id="prScenes" role="group"></div>
+    <div class="pr-row">
+      <div class="pr-row" id="prAnims" role="group"></div>
+      <button class="pr-pill" id="prRotate" aria-pressed="true"><svg class="ic sm"><use href="#i-rotate"/></svg><span data-i18n="rotate"></span></button>
+    </div>
+  </div>
+</section>
+
 <div class="drop-overlay" id="dropOverlay" hidden><div><svg class="ic xl"><use href="#i-upload"/></svg><p data-i18n="dropHere"></p></div></div>
 <input type="file" id="fileInput" accept="image/png" multiple hidden>
 <input type="file" id="backupInput" accept=".json,application/json" hidden>
 <div class="toasts" id="toasts" aria-live="polite"></div>
-
-<!-- Settings -->
-<dialog id="settings" class="sheet narrow" aria-labelledby="sTitle">
-  <div class="sheet-inner">
-    <div class="sheet-top">
-      <h2 class="sheet-title" id="sTitle" data-i18n="settings"></h2>
-      <span class="spacer"></span>
-      <button class="btn icon-only" id="sClose" data-i18n-title="close"><svg class="ic"><use href="#i-x"/></svg></button>
-    </div>
-    <section class="set-block">
-      <h3 data-i18n="look"></h3>
-      <div class="looks" id="lookList" role="radiogroup">
-        <button class="look-opt" role="radio" data-look="standard" id="look-standard"><span class="look-sw standard"><i></i><i></i><i></i></span><b data-i18n="lookStandard"></b><small data-i18n="lookStandardDesc"></small></button>
-        <button class="look-opt" role="radio" data-look="studio" id="look-studio"><span class="look-sw studio"><i></i><i></i><i></i></span><b data-i18n="lookStudio"></b><small data-i18n="lookStudioDesc"></small></button>
-        <button class="look-opt" role="radio" data-look="prism" id="look-prism"><span class="look-sw prism"><i></i><i></i><i></i></span><b data-i18n="lookPrism"></b><small data-i18n="lookPrismDesc"></small></button>
-        <button class="look-opt" role="radio" data-look="mc" id="look-mc"><span class="look-sw mc"><i></i><i></i><i></i></span><b data-i18n="lookMc"></b><small data-i18n="lookMcDesc"></small></button>
-        <button class="look-opt" role="radio" data-look="gallery" id="look-gallery"><span class="look-sw gallery"><i></i><i></i><i></i></span><b data-i18n="lookGallery"></b><small data-i18n="lookGalleryDesc"></small></button>
-      </div>
-    </section>
-    <section class="set-block">
-      <h3 data-i18n="theme"></h3>
-      <div class="seg wide" id="themeSeg"><button data-v="system" id="theme-system" data-i18n="themeSystem"></button><button data-v="light" id="theme-light" data-i18n="themeLight"></button><button data-v="dark" id="theme-dark" data-i18n="themeDark"></button></div>
-    </section>
-    <section class="set-block">
-      <h3 data-i18n="language"></h3>
-      <div class="seg wide" id="langSeg"><button data-v="de" id="lang-de">Deutsch</button><button data-v="en" id="lang-en">English</button></div>
-    </section>
-    <section class="set-block">
-      <h3 data-i18n="storage"></h3>
-      <p class="hint" data-i18n="storageText"></p>
-      <div class="row">
-        <button class="btn" id="backupExportBtn" data-i18n="backupExport"></button>
-        <button class="btn" id="backupImportBtn" data-i18n="backupImport"></button>
-      </div>
-    </section>
-  </div>
-</dialog>
 
 <!-- Detail -->
 <dialog id="detail" class="sheet" aria-labelledby="dName">
@@ -170,6 +177,7 @@
         <div class="row"><button class="chip" id="dRegions" aria-pressed="false" data-i18n="regions"></button></div>
         <div class="row actions">
           <button class="btn primary" id="dEdit"><svg class="ic"><use href="#i-pencil"/></svg><span data-i18n="edit"></span></button>
+          <button class="btn" id="dPresent"><svg class="ic"><use href="#i-play"/></svg><span data-i18n="present"></span></button>
           <button class="btn" id="dExport" data-i18n="exportPng"></button>
           <button class="btn" id="dDup" data-i18n="duplicate"></button>
           <button class="btn danger" id="dDelete" data-i18n="delete"></button>
