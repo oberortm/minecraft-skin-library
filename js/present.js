@@ -298,6 +298,20 @@ function openHeader() {
   clearTimeout(st.hdrTimer);
   st.hdrTimer = setTimeout(() => { if (!document.querySelector(".top:hover")) document.body.classList.remove("hdr-open"); else openHeader(); }, 3500);
 }
+// ---------- hide all controls ----------
+function hideUi() {
+  st.uiHidden = { t: performance.now(), x: null, y: null };
+  togglePanel(false);
+  closeHeader();
+  $("present").classList.add("ui-hidden");
+}
+function showUi() {
+  if (!st.uiHidden) return;
+  st.uiHidden = null;
+  $("present").classList.remove("ui-hidden");
+  wake();
+}
+
 function wake() {
   $("present").classList.remove("idle");
   clearTimeout(st.idleTimer);
@@ -334,6 +348,7 @@ export async function startPresentation(list, startIndex = 0, onExit) {
 
 export function stopPresentation() {
   if (!st.on) return;
+  showUi();
   st.on = false;
   cancelAnimationFrame(st.fx.raf);
   if (st.viewer) st.viewer.renderPaused = true;
@@ -386,6 +401,15 @@ export function setupPresentation() {
   root.addEventListener("pointerdown", wake, true);
   $("hdrClose").addEventListener("click", closeHeader);
   $("prWorld").addEventListener("click", () => togglePanel());
+  $("prHideUi").addEventListener("click", e => { e.stopPropagation(); hideUi(); });
+  // after hiding, a clear mouse movement (not the click jitter) or a tap brings the controls back
+  root.addEventListener("pointermove", e => {
+    const h = st.uiHidden;
+    if (!h || e.pointerType === "touch") return;
+    if (h.x === null) { h.x = e.clientX; h.y = e.clientY; return; }
+    if (performance.now() - h.t > 400 && Math.hypot(e.clientX - h.x, e.clientY - h.y) > 40) showUi();
+  });
+  root.addEventListener("pointerdown", e => { if (st.uiHidden && e.pointerType === "touch") showUi(); }, true);
   $("prQuality").addEventListener("click", e => { const b = e.target.closest("button[data-q]"); if (b) setQuality(b.dataset.q); });
   $("prPackPick").addEventListener("click", () => $("prPackInput").click());
   $("prPackInput").addEventListener("change", e => { const f = e.target.files[0]; e.target.value = ""; if (f) choosePack(f); });
@@ -423,6 +447,7 @@ export function setupPresentation() {
     else if (/^[1-4]$/.test(e.key)) applyScene(SCENES[st.group][Number(e.key) - 1].id);
     else if (e.key.toLowerCase() === "g") toggleGroup();
     else if (e.key.toLowerCase() === "m") openHeader();
+    else if (e.key.toLowerCase() === "h") { st.uiHidden ? showUi() : hideUi(); return; }
     wake();
   });
   // swipe left/right anywhere except on the figure and the controls

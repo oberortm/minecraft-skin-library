@@ -197,6 +197,10 @@ body.hdr-open .pr-menu { background: var(--pr-ui-on); color: var(--pr-ui-on-fg);
 .pr-panel-hint.err { color: #ff8f7a; }
 .present.idle .pr-panel:not([hidden]) { opacity: 1; }
 
+/* "hide controls": a clean view of the skin until the mouse moves or the screen is tapped */
+.present.ui-hidden { cursor: none; }
+.present.ui-hidden :is(.pr-nav, .pr-controls, .pr-corner, .pr-menu, .pr-info, .pr-panel) { opacity: 0 !important; pointer-events: none !important; }
+
 /* chrome fades away when idle */
 .present.idle .pr-nav, .present.idle .pr-controls, .present.idle .pr-corner { opacity: 0; pointer-events: none; }
 .present.idle .pr-controls { transform: translateY(12px); }
