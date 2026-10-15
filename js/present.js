@@ -2,6 +2,7 @@
 import { t, getLang, applyI18n } from "./i18n.js";
 
 import { $ } from "./dom.js";
+import { load3d } from "./view3d.js";
 const KEY = "skin-library-present";
 const reduce = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -15,7 +16,7 @@ export const SCENES = [
 const ANIMS = ["idle", "walk", "run", "fly"];
 
 const st = {
-  on: false, list: [], i: 0, viewer: null, base: null, scene: "studio", anim: "idle", rotate: true,
+  on: false, list: [], i: 0, viewer: null, sv: null, base: null, scene: "studio", anim: "idle", rotate: true,
   fx: { raf: 0, parts: [], mode: null }, idleTimer: 0, hdrTimer: 0, busy: false, onExit: null,
 };
 
@@ -29,10 +30,13 @@ function savePrefs() {
 }
 
 // ---------- 3D viewer ----------
-function initViewer() {
-  if (st.viewer || !window.skinview3d) return st.viewer;
+async function initViewer() {
+  if (st.viewer) return st.viewer;
+  const kit = await load3d();
+  if (!kit || st.viewer) return st.viewer;
   try {
-    const v = new skinview3d.SkinViewer({ width: 600, height: 800 });
+    st.sv = kit.sv;
+    const v = new kit.sv.SkinViewer({ width: 600, height: 800 });
     $("prStage").appendChild(v.canvas);
     v.zoom = 0.66;
     v.fov = 38;
@@ -45,7 +49,7 @@ function initViewer() {
       v.zoom = Math.min(0.66, 0.66 * (r.width / r.height) / 0.95);
     }).observe($("prStage"));
     st.viewer = v;
-  } catch (e) { st.viewer = null; }
+  } catch (e) { console.error("[skin-library] presentation 3D failed:", e); st.viewer = null; }
   return st.viewer;
 }
 
@@ -68,7 +72,7 @@ function applyAnim(id) {
   document.querySelectorAll("#prAnims button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.anim === id)));
   const v = st.viewer;
   if (!v) return;
-  const A = window.skinview3d;
+  const A = st.sv;
   const make = { idle: () => new A.IdleAnimation(), walk: () => new A.WalkingAnimation(), run: () => new A.RunningAnimation(), fly: () => new A.FlyingAnimation() }[id];
   v.animation = reduce() ? null : make();
   if (v.animation && id === "walk") v.animation.speed = 0.75;
@@ -177,15 +181,19 @@ function wake() {
 // ---------- public ----------
 export function presenting() { return st.on; }
 
-export function startPresentation(list, startIndex = 0, onExit) {
+export async function startPresentation(list, startIndex = 0, onExit) {
   if (!list.length) return;
   prefs();
   st.list = list; st.on = true; st.onExit = onExit;
   document.body.classList.add("presenting");
   $("present").hidden = false;
   $("presentBtn").setAttribute("aria-pressed", "true");
-  initViewer();
+  st.i = Math.min(startIndex, list.length - 1);
+  fillInfo(list[st.i]);
+  await initViewer();
+  if (!st.on) return;
   $("prFallback").hidden = !!st.viewer;
+  if (st.viewer) st.viewer.renderPaused = false;
   applyScene(st.scene);
   applyAnim(st.anim);
   applyRotate(st.rotate);
@@ -198,6 +206,7 @@ export function stopPresentation() {
   if (!st.on) return;
   st.on = false;
   cancelAnimationFrame(st.fx.raf);
+  if (st.viewer) st.viewer.renderPaused = true;
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
   document.body.classList.remove("presenting", "hdr-open");
   $("present").hidden = true;

@@ -4,15 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Skin Library</title>
-<meta name="app-version" content="5">
+<meta name="app-version" content="6">
 <meta name="description" content="Personal Minecraft skin library in your browser: collect skins, view them in 3D and draw your own. Everything stays local.">
-<link rel="icon" href="icon.svg?v=5" type="image/svg+xml">
+<link rel="icon" href="icon.svg?v=6" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="css/style.css?v=5">
-<link rel="stylesheet" href="css/looks.css?v=5">
-<link rel="stylesheet" href="css/present.css?v=5">
+<link rel="stylesheet" href="css/style.css?v=6">
+<link rel="stylesheet" href="css/looks.css?v=6">
+<link rel="stylesheet" href="css/present.css?v=6">
 <script>
   // apply the saved theme before first paint; Studio is the only look
   (function () {
@@ -217,54 +217,70 @@
           <button class="tool" data-tool="eraser" id="tool-eraser" data-i18n-title="eraser" aria-pressed="false"><svg class="ic"><use href="#i-eraser"/></svg><kbd>E</kbd></button>
           <button class="tool" data-tool="fill" id="tool-fill" data-i18n-title="fill" aria-pressed="false"><svg class="ic"><use href="#i-fill"/></svg><kbd>G</kbd></button>
           <button class="tool" data-tool="picker" id="tool-picker" data-i18n-title="picker" aria-pressed="false"><svg class="ic"><use href="#i-picker"/></svg><kbd>I</kbd></button>
+          <button class="tool" data-tool="rotate" id="tool-rotate" data-i18n-title="rotateTool" aria-pressed="false"><svg class="ic"><use href="#i-rotate"/></svg><kbd>R</kbd></button>
         </div>
+        <label class="check-line"><input type="checkbox" id="eMirror"> <span data-i18n="mirror"></span></label>
         <h3 data-i18n="color"></h3>
         <div class="color-row">
           <input type="color" id="eColor" value="#3b6fe0">
           <input type="text" id="eHex" value="#3b6fe0" maxlength="7" spellcheck="false" aria-label="Hex">
         </div>
         <div class="swatches" id="eRecent" aria-label="recent"></div>
-        <h3 data-i18n="layer"></h3>
+        <h3 data-i18n="paintOn"></h3>
         <span class="seg" id="eLayer"><button data-v="base" id="elayer-base" data-i18n="layerBase"></button><button data-v="outer" id="elayer-outer" data-i18n="layerOuter"></button></span>
         <div class="checks">
-          <label><input type="checkbox" id="eGrid" checked> <span data-i18n="grid"></span></label>
-          <label><input type="checkbox" id="eRegions"> <span data-i18n="regions"></span></label>
+          <label><input type="checkbox" id="eShowBase" checked> <span data-i18n="showBase"></span></label>
           <label><input type="checkbox" id="eShowOuter" checked> <span data-i18n="showOuter"></span></label>
+          <label class="tex-only"><input type="checkbox" id="eGrid" checked> <span data-i18n="grid"></span></label>
+          <label class="tex-only"><input type="checkbox" id="eRegions"> <span data-i18n="regions"></span></label>
         </div>
         <p class="hint" data-i18n="baseOpaque"></p>
       </aside>
-      <div class="ed-canvas">
-        <div class="texwrap paint"><canvas id="eTex" width="640" height="640"></canvas></div>
+      <div class="ed-canvas" id="eCanvas" data-mode="3d">
+        <div class="ed-mode">
+          <span class="seg" id="eMode"><button data-v="3d" id="emode-3d">3D</button><button data-v="tex" id="emode-tex" data-i18n="texture"></button></span>
+          <p class="hint" id="eHint3d"></p>
+        </div>
+        <div class="paint3d" id="ePaint3d"><div class="fallback" id="ePaintFallback" hidden data-i18n="no3d"></div></div>
+        <div class="texwrap paint" id="eTexWrap"><canvas id="eTex" width="640" height="640"></canvas></div>
       </div>
       <aside class="ed-preview">
-        <div class="flat2 paintable">
+        <div class="mini-tex tex-3d-only"><h3 data-i18n="texture"></h3><div class="texwrap"><canvas id="eTexMini" width="256" height="256"></canvas></div></div>
+        <div class="flat2 paintable tex-only">
           <figure><div class="stage"><canvas id="eFront" width="16" height="32"></canvas></div><figcaption data-i18n="front"></figcaption></figure>
           <figure><div class="stage"><canvas id="eBack" width="16" height="32"></canvas></div><figcaption data-i18n="back"></figcaption></figure>
         </div>
-        <p class="hint" data-i18n="paintHere"></p>
-        <div class="view3d small" id="eView3d"></div>
+        <p class="hint tex-only" data-i18n="paintHere"></p>
+        <div class="view3d small tex-only" id="eView3d"></div>
       </aside>
     </div>
   </div>
 </dialog>
 
 <!--
-  Cache busting: every CSS/JS URL carries ?v=5. The import map below gives every module exactly one
-  versioned URL, so "./app.js" and "./app.js?v=5" never become two module instances.
+  Cache busting: every CSS/JS URL carries ?v=N. The import map below gives every module exactly one
+  versioned URL, so "./app.js" and "./app.js?v=6" never become two module instances.
   Raise the number everywhere in this file for each release (see README).
+  Vendored libraries carry their version in the folder name instead (vendor/three@0.156.1/ ...).
 -->
 <script type="importmap">
 {
   "imports": {
-    "./js/app.js": "./js/app.js?v=5",
-    "./js/db.js": "./js/db.js?v=5",
-    "./js/dom.js": "./js/dom.js?v=5",
-    "./js/editor.js": "./js/editor.js?v=5",
-    "./js/fig3d.js": "./js/fig3d.js?v=5",
-    "./js/i18n.js": "./js/i18n.js?v=5",
-    "./js/motion.js": "./js/motion.js?v=5",
-    "./js/present.js": "./js/present.js?v=5",
-    "./js/skin.js": "./js/skin.js?v=5"
+    "./js/app.js": "./js/app.js?v=6",
+    "./js/db.js": "./js/db.js?v=6",
+    "./js/dom.js": "./js/dom.js?v=6",
+    "./js/editor.js": "./js/editor.js?v=6",
+    "./js/fig3d.js": "./js/fig3d.js?v=6",
+    "./js/i18n.js": "./js/i18n.js?v=6",
+    "./js/motion.js": "./js/motion.js?v=6",
+    "./js/present.js": "./js/present.js?v=6",
+    "./js/skin.js": "./js/skin.js?v=6",
+    "./js/view3d.js": "./js/view3d.js?v=6",
+    "./js/paint3d.js": "./js/paint3d.js?v=6",
+    "skinview3d": "./vendor/skinview3d@3.0.1/skinview3d.js",
+    "skinview-utils": "./vendor/skinview-utils@0.7.1/index.js",
+    "three": "./vendor/three@0.156.1/three.module.min.js",
+    "three/examples/jsm/": "./vendor/three@0.156.1/examples/jsm/"
   }
 }
 </script>
@@ -285,7 +301,6 @@
     }, 4000);
   });
 </script>
-<script src="vendor/skinview3d/skinview3d.bundle.js?v=5"></script>
-<script type="module" src="js/app.js?v=5"></script>
+<script type="module" src="js/app.js?v=6"></script>
 </body>
 </html>

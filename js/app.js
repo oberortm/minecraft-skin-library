@@ -6,6 +6,7 @@ import { startPresentation, stopPresentation, presenting, setupPresentation } fr
 import { buildFigure } from "./fig3d.js";
 import { reveal, bindTilt, trackScroll, splitTitle } from "./motion.js";
 import { $, on, safe, setErrorReporter } from "./dom.js";
+import { load3d } from "./view3d.js";
 
 const state = { skins: [], view: "front", filter: "all", sort: "new", search: "", current: null };
 const UI_KEY = "skin-library-ui";
@@ -208,15 +209,20 @@ async function importBackup(file) {
 }
 
 // ---------- detail ----------
-let viewer = null, regionsOn = false;
-function initViewer() {
-  if (viewer || !window.skinview3d) return viewer;
+let viewer = null, regionsOn = false, sv = null;
+async function initViewer() {
+  if (viewer) return viewer;
+  const kit = await load3d();
+  if (!kit || viewer) return viewer;
   try {
-    viewer = new skinview3d.SkinViewer({ width: 300, height: 400 });
+    sv = kit.sv;
+    viewer = new sv.SkinViewer({ width: 300, height: 400 });
     $("dView3d").appendChild(viewer.canvas);
     viewer.autoRotate = true; viewer.autoRotateSpeed = 0.8; viewer.zoom = 0.85;
+    // only draw while the detail sheet is open
+    viewer.renderPaused = !$("detail").open;
     new ResizeObserver(() => { const r = $("dView3d").getBoundingClientRect(); if (r.width) viewer.setSize(r.width, r.height); }).observe($("dView3d"));
-  } catch (e) { viewer = null; }
+  } catch (e) { console.error("[skin-library] 3D view failed:", e); viewer = null; }
   return viewer;
 }
 export function setOuterLayer(v, on) {
@@ -274,8 +280,10 @@ async function openDetail(id) {
   $("dAdded").textContent = t("added") + ": " + new Date(skin.created).toLocaleDateString(getLang());
   disarmDelete();
   if (!d.open) d.showModal();
-  const v = initViewer();
+  const v = await initViewer();
+  if (state.current !== id) return;
   $("dFallback").hidden = !!v;
+  if (v) v.renderPaused = false;
   const img = await imageOf(skin);
   if (state.current !== id) return;
   if (v) {
@@ -314,7 +322,7 @@ function setupDetail() {
   const d = $("detail");
   on("dClose", "click", () => d.close());
   d.addEventListener("click", e => { if (e.target === d) d.close(); });
-  d.addEventListener("close", () => { state.current = null; renderGrid(); });
+  d.addEventListener("close", () => { state.current = null; if (viewer) viewer.renderPaused = true; renderGrid(); });
   d.addEventListener("keydown", e => {
     if (e.target.matches("input, textarea")) return;
     if (e.key === "ArrowRight") step(1);
@@ -334,7 +342,7 @@ function setupDetail() {
     b.setAttribute("aria-pressed", String(on)); fn(on);
   });
   toggle("dRot", on => { if (viewer) viewer.autoRotate = on; });
-  toggle("dWalk", on => { if (viewer) viewer.animation = on ? Object.assign(new skinview3d.WalkingAnimation(), { speed: 0.6 }) : null; });
+  toggle("dWalk", on => { if (viewer && sv) viewer.animation = on ? Object.assign(new sv.WalkingAnimation(), { speed: 0.6 }) : null; });
   toggle("dOuter", on => setOuterLayer(viewer, on));
   toggle("dRegions", async on => { regionsOn = on; const s = byId(state.current); if (s) drawTexture($("dTex"), await imageOf(s), on); });
   on("dExport", "click", () => { const s = byId(state.current); if (s) download(s.data, safeName(s.name) + ".png"); });

@@ -181,3 +181,18 @@ export function blankTemplate(model) {
   }
   return c;
 }
+
+/**
+ * The pixel on the other side of the body (left <-> right), for mirrored drawing.
+ * Right limbs swap with left limbs, the outer side faces swap, and every face is flipped horizontally.
+ */
+export function mirrorPixel(aw, x, y) {
+  const f = faceAt(aw, x, y);
+  if (!f) return null;
+  const swapPart = { rightArm: "leftArm", leftArm: "rightArm", rightLeg: "leftLeg", leftLeg: "rightLeg" };
+  const swapSide = { right: "left", left: "right" };
+  const part = parts(aw).find(p => p.id === (swapPart[f.part] || f.part) && p.layer === f.layer);
+  const [fx, fy, fw] = f.rect;
+  const [tx, ty] = part.faces[swapSide[f.side] || f.side];
+  return [tx + (fw - 1 - (x - fx)), ty + (y - fy)];
+}
