@@ -304,3 +304,16 @@ h3 { margin: 0; font: 500 11px var(--f-mono); text-transform: uppercase; letter-
   width: min(460px, calc(100vw - 32px)); display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between;
   background: var(--danger); color: #fff; padding: 10px 14px; border-radius: 10px; box-shadow: var(--shadow); font-size: 14px; }
 .boot-fail button { font-weight: 600; background: #fff; color: var(--danger); border: 0; border-radius: 999px; padding: 6px 14px; cursor: pointer; }
+
+/* skin of a Minecraft account, found by typing the player name in the search */
+.player-hit { display: flex; align-items: center; gap: 14px; margin: 0 0 18px; padding: 12px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); }
+.player-hit[hidden] { display: none; }
+.player-hit canvas { width: 32px; height: 64px; image-rendering: pixelated; flex: none; }
+.player-hit[data-state="busy"] canvas, .player-hit[data-state="err"] canvas { opacity: .25; }
+.ph-text { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.ph-text b { font-size: 1.05rem; overflow-wrap: anywhere; }
+.ph-label, #phStatus { color: var(--muted); font-size: .85rem; }
+.player-hit[data-state="err"] #phStatus { color: var(--danger, #c0392b); }
+.empty-player { margin-top: 14px; gap: 8px; flex-wrap: wrap; }
+.empty-player input { min-width: 0; width: 220px; max-width: 100%; padding: 10px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--fg, inherit); font: inherit; }
+@media (max-width: 520px) { .player-hit { flex-wrap: wrap; } .player-hit .btn { width: 100%; justify-content: center; } }

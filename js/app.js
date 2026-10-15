@@ -7,6 +7,7 @@ import { buildFigure } from "./fig3d.js";
 import { reveal, bindTilt, trackScroll, splitTitle } from "./motion.js";
 import { $, on, safe, setErrorReporter } from "./dom.js";
 import { load3d, pixelRatio } from "./view3d.js";
+import { isPlayerName, lookupPlayer } from "./player.js";
 
 // filters: slim/classic are "either", fav narrows to favourites; none active = all
 const state = { skins: [], view: "front", filters: { slim: false, classic: false, fav: false }, sort: "new", search: "", current: null };
@@ -223,6 +224,46 @@ function setupDrop() {
   on("importBtn", "click", pick);
   on("emptyImportBtn", "click", pick);
   on("fileInput", "change", e => { importFiles(Array.from(e.target.files)); e.target.value = ""; });
+}
+
+// ---------- skin of a Minecraft account, by player name ----------
+let playerTimer = 0, playerAbort = null, playerFound = null;
+/** Typing a valid player name in the search looks the account up after a short pause. */
+function playerSearch(text) {
+  clearTimeout(playerTimer);
+  if (playerAbort) { playerAbort.abort(); playerAbort = null; }
+  const name = text.trim();
+  if (!isPlayerName(name)) { $("playerHit").hidden = true; playerFound = null; return; }
+  playerTimer = setTimeout(() => lookupInto(name), 650);
+}
+async function lookupInto(name) {
+  const box = $("playerHit");
+  box.hidden = false; box.dataset.state = "busy";
+  $("phName").textContent = name;
+  $("phStatus").textContent = t("playerSearching");
+  $("phAdd").hidden = true; playerFound = null;
+  const ctrl = playerAbort = new AbortController();
+  try {
+    const hit = await lookupPlayer(name, ctrl.signal);
+    if (ctrl.signal.aborted) return;
+    const url = URL.createObjectURL(hit.blob), img = await loadImage(url);
+    URL.revokeObjectURL(url);
+    if (!(img.width === 64 && (img.height === 64 || img.height === 32))) throw new Error("size");
+    renderFigure($("phFig"), img, detectModel(img), "front", { legacy: img.height === 32 });
+    $("phName").textContent = hit.name;
+    $("phStatus").textContent = t("playerFound");
+    $("phAdd").hidden = false; box.dataset.state = "ok";
+    playerFound = hit;
+  } catch (e) {
+    if (ctrl.signal.aborted) return;
+    box.dataset.state = "err";
+    $("phStatus").textContent = t(e.notFound ? "playerNotFound" : "playerOffline");
+  }
+}
+async function addPlayerSkin() {
+  if (!playerFound) return;
+  await importFiles([new File([playerFound.blob], playerFound.name + ".png", { type: "image/png" })]);
+  $("playerHit").hidden = true;
 }
 
 // ---------- backup ----------
@@ -493,7 +534,9 @@ async function boot() {
     setupFilters();
     $("sortSelect").value = state.sort;
     on("sortSelect", "change", e => { state.sort = e.target.value; saveUi(); renderGrid(); });
-    on("searchInput", "input", e => { state.search = e.target.value; renderGridSoon(); });
+    on("searchInput", "input", e => { state.search = e.target.value; renderGridSoon(); playerSearch(e.target.value); });
+    on("phAdd", "click", addPlayerSkin);
+    on("emptyPlayerForm", "submit", e => { e.preventDefault(); const v = $("emptyPlayer").value.trim(); if (isPlayerName(v)) lookupInto(v); });
   });
   safe("theme", () => {
     syncThemeBtn();

@@ -105,6 +105,16 @@
         <button class="btn primary" id="emptyImportBtn"><svg class="ic"><use href="#i-upload"/></svg><span data-i18n="chooseFiles"></span></button>
         <button class="btn" id="emptyNewBtn"><svg class="ic"><use href="#i-pencil"/></svg><span data-i18n="drawFirst"></span></button>
       </div>
+      <form class="row center empty-player" id="emptyPlayerForm">
+        <label class="sr" for="emptyPlayer" data-i18n="playerLabel"></label>
+        <input id="emptyPlayer" data-i18n-ph="playerPh" autocomplete="off" maxlength="16" spellcheck="false">
+        <button class="btn" type="submit" data-i18n="playerGet"></button>
+      </form>
+    </section>
+    <section class="player-hit" id="playerHit" hidden aria-live="polite">
+      <canvas id="phFig" width="16" height="32" aria-hidden="true"></canvas>
+      <div class="ph-text"><span class="ph-label" data-i18n="playerLabel"></span><b id="phName"></b><span id="phStatus"></span></div>
+      <button class="btn primary" id="phAdd" hidden><svg class="ic"><use href="#i-plus"/></svg><span data-i18n="playerAdd"></span></button>
     </section>
     <p class="no-match" id="noMatch" hidden data-i18n="noMatch"></p>
     <div class="grid" id="grid"></div>
@@ -348,6 +358,7 @@
     "./js/pack.js": "./js/pack.js?v=45",
     "./js/equipment.js": "./js/equipment.js?v=45",
     "./js/equipart.js": "./js/equipart.js?v=45",
+    "./js/player.js": "./js/player.js?v=45",
     "./js/mcworld.js": "./js/mcworld.js?v=45",
     "skinview3d": "./vendor/skinview3d@3.0.1/skinview3d.js",
     "skinview-utils": "./vendor/skinview-utils@0.7.1/index.js",
@@ -386,6 +397,7 @@
 <link rel="modulepreload" href="js/present.js?v=45">
 <link rel="modulepreload" href="js/equipment.js?v=45">
 <link rel="modulepreload" href="js/equipart.js?v=45">
+<link rel="modulepreload" href="js/player.js?v=45">
 <link rel="modulepreload" href="js/pack.js?v=45">
 <script type="module" src="js/app.js?v=45"></script>
 </body>
