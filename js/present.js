@@ -401,7 +401,15 @@ export function setupPresentation() {
   document.addEventListener("pointerdown", e => {
     if (st.on && document.body.classList.contains("hdr-open") && !e.target.closest(".top, #prMenu")) closeHeader();
   }, true);
-  document.addEventListener("pointermove", e => { if (st.on && e.clientY < 10) openHeader(); });
+  document.addEventListener("pointermove", e => {
+    if (!st.on) return;
+    if (e.clientY < 10) { openHeader(); return; }
+    // moving clearly away below the open header closes it again (however it was opened)
+    if (e.pointerType === "mouse" && document.body.classList.contains("hdr-open")) {
+      const bottom = document.querySelector(".top").getBoundingClientRect().bottom;
+      if (e.clientY > bottom + 70) closeHeader();
+    }
+  });
   document.querySelector(".top").addEventListener("pointerenter", () => { if (st.on) clearTimeout(st.hdrTimer); });
   document.querySelector(".top").addEventListener("pointerleave", () => { if (st.on && document.body.classList.contains("hdr-open")) openHeader(); });
   document.addEventListener("keydown", e => {
