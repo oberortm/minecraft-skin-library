@@ -7,6 +7,9 @@
 import { itemFiles } from "./equipment.js";
 
 const DB_NAME = "skin-library-pack";
+/** Raised when the list of textures we take from a pack grows: older stored packs get downloaded again. */
+const PACK_FORMAT = 2;
+export const packStale = pack => !pack || (pack.format || 1) < PACK_FORMAT;
 const STORE = "pack";
 
 /** Our texture names -> file names in a pack (1.13+ first, then the old 1.8-1.12 names), plus tint. */
@@ -109,7 +112,7 @@ export async function readPackBuffer(buf, name) {
     }
   }
   if (!Object.keys(blobs).length) throw new Error("no textures");
-  return { name, blobs };
+  return { name, blobs, format: PACK_FORMAT };
 }
 
 /** Read a resource pack file the user picked. */
@@ -119,12 +122,14 @@ export async function readPack(file) {
 
 // ---------- downloadable sources ----------
 /** What the texture menu offers. "builtin" = drawn in code, "file" = a .zip the user picks. */
+export const downloadable = id => !["builtin", "file"].includes(id) && SOURCES.some(s => s.id === id);
 export const SOURCES = [
   { id: "builtin" },
   { id: "vanilla", name: "Minecraft", page: "https://www.minecraft.net/" },
   { id: "faithful", name: "Faithful 32x", slug: "faithful-32x", page: "https://modrinth.com/resourcepack/faithful-32x" },
   { id: "barebones", name: "Bare Bones", slug: "bare-bones", page: "https://modrinth.com/resourcepack/bare-bones" },
-  { id: "staytrue", name: "Stay True", slug: "stay-true", page: "https://www.curseforge.com/minecraft/texture-packs/stay-true" },
+  // Stay True is only on CurseForge, which does not allow downloads from a web page: Ashen instead
+  { id: "ashen", name: "Ashen 16x", slug: "ashen-16x", alt: ["ashen"], page: "https://modrinth.com/resourcepack/ashen-16x" },
   { id: "file" },
 ];
 
@@ -162,13 +167,18 @@ async function vanillaUrl() {
 /** The newest file of a resource pack on Modrinth (found by slug, else by name). */
 async function modrinthUrl(src) {
   const api = "https://api.modrinth.com/v2";
-  let slug = src.slug, versions;
-  try { versions = await fetchJson(`${api}/project/${slug}/version`); }
-  catch (e) {
+  let versions = null;
+  for (const slug of [src.slug, ...(src.alt || [])]) {
+    try { versions = await fetchJson(`${api}/project/${slug}/version`); break; } catch (e) { /* try the next name */ }
+  }
+  if (!versions) {
+    // renamed project: search by name, the closest title wins
     const q = encodeURIComponent(src.name), facets = encodeURIComponent('[["project_type:resourcepack"]]');
-    const hit = (await fetchJson(`${api}/search?query=${q}&facets=${facets}`)).hits.find(h => h.title.toLowerCase() === src.name.toLowerCase());
+    const hits = (await fetchJson(`${api}/search?query=${q}&facets=${facets}`)).hits;
+    const word = src.name.toLowerCase().split(" ")[0];
+    const hit = hits.find(h => h.title.toLowerCase() === src.name.toLowerCase()) || hits.find(h => h.title.toLowerCase().startsWith(word));
     if (!hit) throw new Error("not found");
-    slug = hit.slug; versions = await fetchJson(`${api}/project/${slug}/version`);
+    versions = await fetchJson(`${api}/project/${hit.slug}/version`);
   }
   const files = versions[0] && versions[0].files;
   const file = files && (files.find(f => f.primary) || files[0]);
@@ -217,7 +227,8 @@ const SOURCE_KEY = "skin-library-texture-source";
 export async function selectedSource() {
   try { const v = localStorage.getItem(SOURCE_KEY); if (SOURCES.some(s => s.id === v)) return v; } catch (e) { /* ignore */ }
   const old = await tx("readonly", st => st.get("current")).catch(() => null);
-  return old ? "file" : "builtin";
+  // Minecraft's own textures by default; our drawings only when that fails or on request
+  return old ? "file" : "vanilla";
 }
 export function selectSource(id) { try { localStorage.setItem(SOURCE_KEY, id); } catch (e) { /* ignore */ } }
 /** Stored packs, one per source; "file" also finds the pack saved by earlier versions. */

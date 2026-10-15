@@ -128,7 +128,7 @@
   <div class="pr-corner">
     <button class="pr-icon" id="prEquip" aria-expanded="false" aria-controls="prEquipPanel" data-i18n-title="equipment"><svg class="ic"><use href="#i-armor"/></svg></button>
     <button class="pr-icon" id="prHideUi" data-i18n-title="hideUi"><svg class="ic"><use href="#i-eye-off"/></svg></button>
-    <button class="pr-icon pr-world-btn" id="prWorld" aria-expanded="false" aria-controls="prWorldPanel" data-i18n-title="worldSettings"><svg class="ic"><use href="#i-gear"/></svg></button>
+    <button class="pr-icon pr-world-btn" id="prWorld" aria-expanded="false" aria-controls="prWorldPanel" data-i18n-title="settings"><svg class="ic"><use href="#i-gear"/></svg></button>
     <button class="pr-icon" id="prFull" data-i18n-title="fullscreen"><svg class="ic"><use href="#i-full"/></svg></button>
     <button class="pr-icon" id="prClose" data-i18n-title="presentExit"><svg class="ic"><use href="#i-x"/></svg></button>
   </div>
@@ -139,24 +139,26 @@
     <div id="eqArmor"></div>
     <div id="eqItems"></div>
   </div>
+  <div class="pr-tex-badge" id="prTexBadge" role="status" hidden><span data-i18n="texLoading"></span> <b id="prTexBadgePct"></b></div>
   <div class="pr-panel" id="prWorldPanel" hidden>
     <h3 data-i18n="worldSettings"></h3>
-    <div class="pr-panel-row">
+    <div class="pr-panel-row pr-quality-row">
       <span class="pr-panel-label" data-i18n="quality"></span>
       <span class="pr-seg" id="prQuality" role="group"><button type="button" data-q="high" id="quality-high" data-i18n="qualityHigh"></button><button type="button" data-q="low" id="quality-low" data-i18n="qualityLow"></button></span>
     </div>
-    <p class="pr-panel-hint" data-i18n="qualityHint"></p>
+    <p class="pr-panel-hint pr-quality-row" data-i18n="qualityHint"></p>
     <label class="pr-panel-row">
       <span class="pr-panel-label" data-i18n="resourcePack"></span>
       <select class="pr-select" id="prTexSource">
-        <option value="builtin" data-i18n="texBuiltin"></option>
         <option value="vanilla" data-i18n="texVanilla"></option>
         <option value="faithful">Faithful 32x</option>
         <option value="barebones">Bare Bones</option>
-        <option value="staytrue">Stay True</option>
+        <option value="ashen">Ashen 16x</option>
+        <option value="builtin" data-i18n="texBuiltin"></option>
         <option value="file" data-i18n="texFile"></option>
       </select>
     </label>
+    <button class="pr-pill" id="prPackReload" type="button" data-i18n="texReload" hidden></button>
     <div class="pr-progress" id="prPackProgress" hidden><progress id="prPackBar" max="1"></progress><span id="prPackPct"></span></div>
     <div class="pr-panel-row" id="prPackFileRow" hidden>
       <span class="pr-pack-name" id="prPackName"></span>

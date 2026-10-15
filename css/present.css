@@ -179,8 +179,16 @@ body.hdr-open .pr-menu { background: var(--pr-ui-on); color: var(--pr-ui-on-fg);
 .pr-icon:focus-visible, .pr-nav:focus-visible, .pr-pill:focus-visible { outline: 2px solid var(--pr-fg); outline-offset: 2px; }
 
 /* Minecraft world settings: gear button + small panel, only in the Minecraft group */
-.pr-world-btn { display: none !important; }
-.present[data-group="minecraft"] .pr-world-btn { display: grid !important; }
+/* settings in both groups; the quality switch only matters for the block worlds */
+.present[data-group="classic"] .pr-quality-row { display: none; }
+#prPackReload { justify-self: start; }
+.pr-tex-badge {
+  position: absolute; z-index: 4; right: max(16px, env(safe-area-inset-right, 0px)); top: calc(max(16px, env(safe-area-inset-top, 0px)) + 56px);
+  padding: 6px 12px; border-radius: 999px; font: 600 12px var(--f-body); font-variant-numeric: tabular-nums;
+  background: var(--pr-ui); color: var(--pr-fg); border: 1px solid var(--pr-ui-line); backdrop-filter: blur(14px);
+}
+.pr-tex-badge[hidden] { display: none; }
+.present:has(.pr-panel:not([hidden])) .pr-tex-badge { display: none; }
 .pr-world-btn[aria-expanded="true"] { background: var(--pr-ui-on); color: var(--pr-ui-on-fg); }
 .pr-panel {
   position: absolute; z-index: 4; right: max(16px, env(safe-area-inset-right, 0px)); top: calc(max(16px, env(safe-area-inset-top, 0px)) + 54px);

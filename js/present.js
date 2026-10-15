@@ -4,7 +4,7 @@ import { t, applyI18n } from "./i18n.js";
 import { $ } from "./dom.js";
 import { load3d, pixelRatio } from "./view3d.js";
 import { loadEquipment, saveEquipment, applyElytra, applyArmor, ARMOR_SLOTS, ARMOR_MATS, TRIM_PATTERNS, TRIM_MATS, applyItems, ITEMS, TOOL_MATS } from "./equipment.js";
-import { readPack, packCanvases, savePack, loadPack, SOURCES, downloadSource, selectedSource, selectSource } from "./pack.js";
+import { readPack, packCanvases, savePack, loadPack, clearPack, SOURCES, downloadSource, selectedSource, selectSource, packStale, downloadable } from "./pack.js";
 const KEY = "skin-library-present";
 const QUALITY_KEY = "skin-library-mc-quality";
 const savedQuality = () => { try { const q = localStorage.getItem(QUALITY_KEY); return q === "high" || q === "low" ? q : null; } catch (e) { return null; } };
@@ -244,6 +244,7 @@ function buildArmorUi() {
   });
 }
 function setElytra(on) {
+  st.flyAuto = null;   // changed by hand: keep it as chosen
   st.equip.elytra = on;
   // the elytra takes the chestplate's place
   if (on) st.equip.armor.chest.mat = null;
@@ -258,22 +259,40 @@ function toggleEquipPanel(open = $("prEquipPanel").hidden) {
   $("prEquip").setAttribute("aria-expanded", String(open));
   if (open) syncEquipUi();
 }
-/** Textures of the selected source, for the equipment (also when no block world is shown). */
-async function loadPackTextures() {
+/**
+ * Load the textures of the selected source (Minecraft's own by default). A downloadable source that
+ * is not stored yet, or stored by an older version without the item textures, is downloaded first,
+ * with a small progress badge. When that fails, our own drawings are used and the panel says why.
+ */
+async function ensureTextures(force = false) {
+  const seq = st.packSeq = (st.packSeq || 0) + 1;
   const id = await selectedSource();
-  const pack = id === "builtin" ? null : await loadPack(id);
+  let pack = id === "builtin" ? null : await loadPack(id);
+  st.packFailed = st.packFailed || {};
+  if (downloadable(id) && (force || packStale(pack)) && (force || !st.packFailed[id])) {
+    progress(0);
+    try {
+      pack = await downloadSource(id, progress);
+      await savePack(id, pack);
+      st.packMsg = [t("texLoaded", { name: pack.name }), false];
+    } catch (e) {
+      st.packFailed[id] = true;
+      // keep an older stored copy if there is one; else our drawings
+      st.packMsg = [t(pack ? "texFailedOld" : "texFallback"), true, SOURCES.find(s => s.id === id).page];
+    }
+    progress(null);
+  }
+  if (seq !== st.packSeq) return st.packTex;
   st.packTex = pack ? await packCanvases(pack) : null;
+  if (st.world) st.world.setPack(st.packTex);
+  applyEquipment();
+  if (!$("prWorldPanel").hidden) syncPackUi(id, pack);
   return st.packTex;
 }
+async function loadPackTextures() { return ensureTextures(); }
 
-// ---------- texture source: built-in (default), Minecraft, three packs, own file ----------
-async function applySavedPack() {
-  const id = await selectedSource();
-  syncPackUi(id);
-  const tex = await loadPackTextures();
-  if (st.world) st.world.setPack(tex);
-  applyEquipment();
-}
+// ---------- texture source: Minecraft (default), three packs, own file, our own drawings ----------
+async function applySavedPack() { await ensureTextures(); }
 function setHint(text, err = false, link = null) {
   const hint = $("prPackHint");
   hint.textContent = "";
@@ -287,46 +306,38 @@ function setHint(text, err = false, link = null) {
 async function syncPackUi(id, pack) {
   $("prTexSource").value = id;
   $("prPackFileRow").hidden = id !== "file";
+  $("prPackReload").hidden = !downloadable(id);
   if (id === "file") {
     pack = pack || await loadPack("file");
     $("prPackName").textContent = pack ? pack.name : "";
   }
+  if (st.packMsg) { setHint(...st.packMsg); st.packMsg = null; return; }
   setHint(id === "builtin" ? t("texBuiltinHint") : id === "file" ? t("packHint") : id === "vanilla" ? t("texVanillaHint") : t("texDownloadHint"));
 }
+/** Progress 0..1 (-1 unknown) in the panel and in a small badge that is visible with the panel closed. */
 function progress(p) {
-  $("prPackProgress").hidden = p === null;
-  if (p === null) return;
-  $("prPackBar").value = p < 0 ? undefined : p;
-  if (p < 0) $("prPackBar").removeAttribute("value");
-  $("prPackPct").textContent = p < 0 ? "…" : Math.round(p * 100) + " %";
+  const busy = p !== null;
+  $("prPackProgress").hidden = !busy; $("prTexBadge").hidden = !busy;
+  $("prTexSource").disabled = busy; $("prPackReload").disabled = busy;
+  if (!busy) return;
+  const pct = p < 0 ? "…" : Math.round(p * 100) + " %";
+  if (p < 0) $("prPackBar").removeAttribute("value"); else $("prPackBar").value = p;
+  $("prPackPct").textContent = pct;
+  $("prTexBadgePct").textContent = pct;
 }
 async function chooseSource(id) {
-  st.packSeq = (st.packSeq || 0) + 1;
-  const prev = await selectedSource();
-  if (id === "builtin") {
-    selectSource("builtin"); st.packTex = null; if (st.world) st.world.setPack(null); applyEquipment(); syncPackUi("builtin"); return;
-  }
-  let pack = await loadPack(id);
-  if (!pack) {
-    $("prTexSource").disabled = true;
-    progress(0);
-    try {
-      pack = await downloadSource(id, progress);
-      await savePack(id, pack);
-    } catch (e) {
-      progress(null); $("prTexSource").disabled = false;
-      syncPackUi(prev);
-      setHint(t("texFailed"), true, SOURCES.find(s => s.id === id).page);
-      return;
-    }
-    progress(null); $("prTexSource").disabled = false;
-  }
   selectSource(id);
-  st.packTex = await packCanvases(pack);
-  if (st.world) st.world.setPack(st.packTex);
-  applyEquipment();
+  if (st.packFailed) st.packFailed[id] = false;   // choosing it again is a new try
+  st.packMsg = null;
+  await ensureTextures();
   syncPackUi(id);
-  setHint(t("texLoaded", { name: pack.name }));
+}
+async function reloadSource() {
+  const id = await selectedSource();
+  if (!downloadable(id)) return;
+  st.packMsg = null;
+  await ensureTextures(true);
+  syncPackUi(id);
 }
 async function choosePack(file) {
   st.packSeq = (st.packSeq || 0) + 1;
@@ -372,7 +383,17 @@ function toggleGroup() {
 
 function applyAnim(id, byUser = false) {
   // flying needs an elytra, like in the game
-  if (id === "fly" && byUser && !st.equip.elytra) setElytra(true);
+  if (id === "fly" && byUser && !st.equip.elytra) {
+    const chest = { ...st.equip.armor.chest };
+    setElytra(true);
+    st.flyAuto = { chest };
+  } else if (id !== "fly" && st.flyAuto) {
+    // flying put the elytra on: landing takes it off and puts back what was worn before
+    const { chest } = st.flyAuto;
+    st.flyAuto = null;
+    st.equip.elytra = false; st.equip.armor.chest = chest;
+    saveEquipment(st.equip); syncEquipUi(); applyEquipment();
+  }
   st.anim = id;
   if (byUser) st.motion = true;
   // buttons only look pressed when they really do something
@@ -639,6 +660,7 @@ export function setupPresentation() {
   root.addEventListener("pointerdown", e => { if (st.uiHidden && e.pointerType === "touch") showUi(); }, true);
   $("prQuality").addEventListener("click", e => { const b = e.target.closest("button[data-q]"); if (b) setQuality(b.dataset.q); });
   $("prPackPick").addEventListener("click", () => $("prPackInput").click());
+  $("prPackReload").addEventListener("click", reloadSource);
   $("prPackInput").addEventListener("change", e => { const f = e.target.files[0]; e.target.value = ""; if (f) choosePack(f); });
   $("prTexSource").addEventListener("change", e => {
     // the file picker must open right inside the user's action, before anything asynchronous
