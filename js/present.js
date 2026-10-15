@@ -5,6 +5,7 @@ import { $ } from "./dom.js";
 import { load3d, pixelRatio } from "./view3d.js";
 import { loadEquipment, saveEquipment, applyElytra, applyArmor, ARMOR_SLOTS, ARMOR_MATS, TRIM_PATTERNS, TRIM_MATS, applyItems, ITEMS, TOOL_MATS } from "./equipment.js";
 import { EMOTES, emoteAnimations } from "./emotes.js";
+import { buildFilm, trailer, videoType } from "./cinema.js";
 import { readPack, packCanvases, savePack, loadPack, clearPack, SOURCES, downloadSource, selectedSource, selectSource, packStale, downloadable } from "./pack.js";
 const KEY = "skin-library-present";
 const QUALITY_KEY = "skin-library-mc-quality";
@@ -447,7 +448,7 @@ function toggleEmotes(open = $("prEmotes").hidden) {
   $("prEmoteBtn").setAttribute("aria-expanded", String(open));
 }
 function closeExtraPanels() {
-  for (const [panel, btn] of [["prPhotoPanel", "prPhoto"], ["prGroupPanel", "prGroupBtn"], ["prEmotes", "prEmoteBtn"]]) {
+  for (const [panel, btn] of [["prPhotoPanel", "prPhoto"], ["prGroupPanel", "prGroupBtn"], ["prEmotes", "prEmoteBtn"], ["prCinePanel", "prCineBtn"]]) {
     if ($(panel)) $(panel).hidden = true;
     if ($(btn)) $(btn).setAttribute("aria-expanded", "false");
   }
@@ -458,6 +459,68 @@ function toggleExtra(panel, btn, open = $(panel).hidden) {
   $(btn).setAttribute("aria-expanded", String(open));
   if (open && panel === "prGroupPanel") renderGroupList();
   if (open && panel === "prPhotoPanel") syncPhotoUi();
+}
+
+// ---------- cinema: build film and trailer, optionally recorded ----------
+async function startCine(kind) {
+  const v = st.viewer, kit = await load3d();
+  if (!v || !kit || st.cine) return;
+  closeExtraPanels(); togglePanel(false); toggleEquipPanel(false); closeHeader();
+  const record = $("cineRecord").checked ? videoType() : null;
+  const saved = {
+    scene: st.scene, anim: st.anim, rotate: st.rotate, motion: st.motion, group: st.groupOn,
+    cam: v.camera.position.clone(), target: v.controls.target.clone(),
+    min: v.controls.minDistance, max: v.controls.maxDistance,
+  };
+  if (st.groupOn) setGroupOn(false);
+  $("present").classList.add("cine");
+  v.autoRotate = false; v.controls.autoRotate = false;
+  v.controls.enabled = false; v.controls.minDistance = 0; v.controls.maxDistance = Infinity;
+  v.playerWrapper.rotation.y = 0;
+  const free = () => { if (st.world) { st.world.freeCamera = true; st.world.wantDist = null; } };
+  free();
+  let done = false;
+  const host = {
+    viewer: v, THREE: kit.THREE, overlay: $("prCine"), skin: st.list[st.i],
+    scene: async id => { await applyScene(id); free(); },
+    sceneNow: id => { applyScene(id).then(free); },
+    anim: (id, speed = 1) => {
+      v.animation = null; resetPose(v.playerObject);
+      if (id) { v.animation = makeAnim(id); v.animation.speed = speed; }
+    },
+    elytra: on => {
+      if (on) { st.cineElytra = true; applyElytra(v, true, st.packTex).catch(() => {}); }
+      else if (st.cineElytra) { st.cineElytra = false; applyEquipment(); }
+    },
+    world: () => st.world,
+    started: c => { st.cineObj = c; },
+    done: async () => {
+      if (done) return;
+      done = true;
+      st.cine = null; st.cineObj = null;
+      if (st.world) st.world.freeCamera = false;
+      $("present").classList.remove("cine");
+      v.controls.enabled = true;
+      await applyScene(saved.scene);
+      if (st.world) st.world.freeCamera = false;
+      v.controls.minDistance = saved.min; v.controls.maxDistance = saved.max;
+      v.controls.target.copy(saved.target); v.camera.position.copy(saved.cam);
+      if (st.world) st.world.wantDist = saved.cam.distanceTo(saved.target);
+      v.controls.update();
+      st.motion = saved.motion;
+      applyAnim(saved.anim);
+      applyRotate(saved.rotate);
+      await applyEquipment();
+      if (saved.group) setGroupOn(true);
+      wake();
+    },
+  };
+  st.cine = true;
+  const film = kind === "build" ? buildFilm(host, record) : trailer(host, record);
+  film.catch(e => { console.error("[skin-library] cinema failed:", e); host.done(); });
+}
+function stopCine() {
+  if (st.cineObj) st.cineObj.stop();
 }
 
 // ---------- weather (block worlds outdoors) ----------
@@ -855,6 +918,7 @@ export async function startPresentation(list, startIndex = 0, onExit) {
 export function stopPresentation() {
   if (!st.on) return;
   showUi();
+  if (st.cineObj) st.cineObj.stop();
   st.on = false;
   if (st.groupOn) setGroupOn(false);
   closeExtraPanels();
@@ -897,6 +961,15 @@ export function setupPresentation() {
     return b;
   }));
   $("prPhoto").addEventListener("click", () => toggleExtra("prPhotoPanel", "prPhoto"));
+  $("prCineBtn").addEventListener("click", () => {
+    toggleExtra("prCinePanel", "prCineBtn");
+    const ok = !!videoType();
+    $("cineRecord").disabled = !ok; $("cineNoVideo").hidden = ok;
+  });
+  $("cineBuild").addEventListener("click", () => startCine("build"));
+  $("cineTrailer").addEventListener("click", () => startCine("trailer"));
+  // a click or Esc ends a running film
+  $("present").addEventListener("pointerdown", e => { if (st.cine && st.cineObj) { e.stopPropagation(); stopCine(); } }, true);
   $("prGroupBtn").addEventListener("click", () => toggleExtra("prGroupPanel", "prGroupBtn"));
   $("prPhotoBg").addEventListener("click", e => { const b = e.target.closest("button[data-v]"); if (b && !b.disabled) setPhotoPref("bg", b.dataset.v); });
   $("prPhotoSize").addEventListener("click", e => { const b = e.target.closest("button[data-v]"); if (b) setPhotoPref("size", b.dataset.v); });
@@ -905,7 +978,7 @@ export function setupPresentation() {
   $("prWeather").addEventListener("change", e => setWeather(e.target.value));
   document.addEventListener("pointerdown", e => {
     if (!st.on) return;
-    for (const [panel, btn] of [["prPhotoPanel", "prPhoto"], ["prGroupPanel", "prGroupBtn"], ["prEmotes", "prEmoteBtn"]]) {
+    for (const [panel, btn] of [["prPhotoPanel", "prPhoto"], ["prGroupPanel", "prGroupBtn"], ["prEmotes", "prEmoteBtn"], ["prCinePanel", "prCineBtn"]]) {
       if (!$(panel).hidden && !e.target.closest(`#${panel}, #${btn}`)) { $(panel).hidden = true; $(btn).setAttribute("aria-expanded", "false"); }
     }
   }, true);
@@ -980,8 +1053,11 @@ export function setupPresentation() {
   document.querySelector(".top").addEventListener("pointerleave", () => { if (st.on && document.body.classList.contains("hdr-open")) openHeader(); });
   document.addEventListener("keydown", e => {
     if (!st.on || e.target.matches("input, textarea, select") || document.querySelector("dialog[open]")) return;
+    // while a film runs, only Esc (end it) does something
+    if (st.cine) { if (e.key === "Escape") { e.preventDefault(); stopCine(); } return; }
     if (e.key === "ArrowRight") { e.preventDefault(); show(st.i + 1, 1); }
     else if (e.key === "ArrowLeft") { e.preventDefault(); show(st.i - 1, -1); }
+    else if (e.key === "Escape" && st.cine) stopCine();
     else if (e.key === "Escape" && !$("prWorldPanel").hidden) togglePanel(false);
     else if (e.key === "Escape" && !$("prEquipPanel").hidden) toggleEquipPanel(false);
     else if (e.key === "Escape" && ["prPhotoPanel", "prGroupPanel", "prEmotes"].some(id => !$(id).hidden)) closeExtraPanels();

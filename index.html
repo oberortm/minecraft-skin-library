@@ -136,6 +136,7 @@
   <div class="pr-floor" aria-hidden="true"></div>
   <div class="pr-stage" id="prStage"><div class="fallback" id="prFallback" hidden>3D unavailable</div></div>
   <div class="pr-flash" aria-hidden="true"></div>
+  <canvas class="pr-cine" id="prCine" aria-hidden="true"></canvas>
   <button class="pr-icon pr-menu" id="prMenu" data-i18n-title="showHeader"><svg class="ic"><use href="#i-menu"/></svg></button>
   <div class="pr-corner">
     <button class="pr-icon" id="prEquip" aria-expanded="false" aria-controls="prEquipPanel" data-i18n-title="equipment"><svg class="ic"><use href="#i-armor"/></svg></button>
@@ -169,6 +170,12 @@
     <div class="grp-list" id="grpList"></div>
   </div>
   <div class="pr-panel pr-emotes" id="prEmotes" hidden></div>
+  <div class="pr-panel pr-emotes pr-cine-panel" id="prCinePanel" hidden>
+    <button class="pr-cine-opt" type="button" id="cineBuild"><b data-i18n="cineBuild"></b><span data-i18n="cineBuildHint"></span></button>
+    <button class="pr-cine-opt" type="button" id="cineTrailer"><b data-i18n="cineTrailer"></b><span data-i18n="cineTrailerHint"></span></button>
+    <label class="pr-check"><input type="checkbox" id="cineRecord"> <span data-i18n="cineRecord"></span></label>
+    <p class="pr-panel-hint" id="cineNoVideo" hidden data-i18n="cineNoVideo"></p>
+  </div>
   <div class="pr-tex-badge" id="prTexBadge" role="status" hidden><span data-i18n="texLoading"></span> <b id="prTexBadgePct"></b></div>
   <div class="pr-panel" id="prWorldPanel" hidden>
     <h3 data-i18n="worldSettings"></h3>
@@ -218,6 +225,7 @@
     <div class="pr-row" id="prScenes" role="group"></div>
     <div class="pr-row">
       <div class="pr-row" id="prAnims" role="group"></div>
+      <button class="pr-pill" id="prCineBtn" aria-expanded="false" aria-controls="prCinePanel"><svg class="ic sm"><use href="#i-play"/></svg><span data-i18n="cinema"></span></button>
       <button class="pr-pill" id="prRotate" aria-pressed="true"><svg class="ic sm"><use href="#i-rotate"/></svg><span data-i18n="rotate"></span></button>
     </div>
   </div>
@@ -428,6 +436,7 @@
     "./js/pfp.js": "./js/pfp.js?v=49",
     "./js/edextra.js": "./js/edextra.js?v=49",
     "./js/emotes.js": "./js/emotes.js?v=49",
+    "./js/cinema.js": "./js/cinema.js?v=49",
     "./js/mcworld.js": "./js/mcworld.js?v=49",
     "skinview3d": "./vendor/skinview3d@3.0.1/skinview3d.js",
     "skinview-utils": "./vendor/skinview-utils@0.7.1/index.js",
@@ -470,6 +479,7 @@
 <link rel="modulepreload" href="js/pfp.js?v=49">
 <link rel="modulepreload" href="js/edextra.js?v=49">
 <link rel="modulepreload" href="js/emotes.js?v=49">
+<link rel="modulepreload" href="js/cinema.js?v=49">
 <link rel="modulepreload" href="js/pack.js?v=49">
 <script type="module" src="js/app.js?v=49"></script>
 </body>
