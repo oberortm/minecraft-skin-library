@@ -305,7 +305,7 @@ const LOOKS = {
     sky: { top: "#3a5a92", horizon: "#ffb27a", bottom: "#c88a6a", sun: sunAt(SUNRISE_AZ, 0.09), sunColor: "#ffc896", sunSize: 0.03, glow: 0.9 },
     fog: ["#f2b48a", 180, 760], hemi: ["#a8c4ff", "#7a5236", 0.72],
     key: { dir: sunAt(SUNRISE_AZ, 0.2), color: "#ffb36b", intensity: 2.4 }, fill: 0.3,
-    bloom: [0.4, 0.55, 0.85], player: [0.2, 0.45], rays: { color: "#ffc994", strength: 0.6, sprite: true }, face: SUNRISE_AZ,
+    bloom: [0.4, 0.55, 0.85], player: [0.2, 0.45], rays: { color: "#ffc994", strength: 0.6, sprite: true }, face: SUNRISE_AZ, water: ["#2a5a8c", 1, 2.0],
   },
   "mc-night": {
     set: "land", exposure: 1.35,
@@ -314,7 +314,7 @@ const LOOKS = {
     fog: ["#101c34", 170, 700], hemi: ["#5470b8", "#0e0d10", 0.55],
     // the moon stands behind the starting camera and lights the figure's front; turn around to see it
     key: { dir: sunAt(0.75, 0.38), color: "#b4c8ff", intensity: 1.15 }, fill: 0.15, fillColor: "#c8d6ff",
-    bloom: [0.5, 0.6, 0.8], player: [0.12, 0.25], rays: { color: "#9fb6ff", strength: 0.35 },
+    bloom: [0.5, 0.6, 0.8], player: [0.12, 0.25], rays: { color: "#9fb6ff", strength: 0.2 }, water: ["#0c1c36", 0.3, 0.45],
   },
 };
 
@@ -473,9 +473,10 @@ export class McWorld {
       m.map = t; m.needsUpdate = true;
     }
     if (this.water) {
-      const wm = this.water.material, wt = this.makeTexture("water");
+      const wm = this.waterSimple, wt = this.makeTexture("water");
       wt.wrapS = wt.wrapT = THREE.RepeatWrapping; wt.repeat.set(140, 140); wt.minFilter = THREE.NearestFilter;
       const prev = wm.map; wm.map = wt; wm.needsUpdate = true;
+      if (this.waterFancy) this.waterFancy.uniforms.tColor.value = wt;
       this.disposables = this.disposables.filter(d => d !== prev); prev.dispose(); this.disposables.push(wt);
     }
     old.forEach(t => t.dispose());
@@ -622,8 +623,111 @@ export class McWorld {
     water.receiveShadow = true;
     g.add(water);
     this.water = water;
+    this.waterSimple = water.material;
     this.disposables.push(wt, water.geometry, water.material);
+    if (this.quality === "high") this.enableReflections();
     return g;
+  }
+
+  // ---------- reflective water (high quality) ----------
+  /** A mirror camera renders the scene below the water plane; a shader mixes it in with waves and Fresnel. */
+  enableReflections() {
+    if (!this.water || this.waterFancy) return;
+    const r = this.viewer.renderer;
+    const size = new THREE.Vector2(); r.getDrawingBufferSize(size);
+    this.reflectRT = new THREE.WebGLRenderTarget(Math.max(256, size.x >> 1), Math.max(256, size.y >> 1), { type: this.hdr ? THREE.HalfFloatType : THREE.UnsignedByteType });
+    this.reflectCam = new THREE.PerspectiveCamera();
+    this.textureMatrix = new THREE.Matrix4();
+    this.waterFancy = new THREE.ShaderMaterial({
+      transparent: true,
+      uniforms: {
+        tReflect: { value: this.reflectRT.texture }, tColor: { value: this.waterSimple.map }, textureMatrix: { value: this.textureMatrix },
+        time: { value: 0 }, sunDir: { value: new THREE.Vector3(0, 1, 0) }, sunColor: { value: new THREE.Color() },
+        waterColor: { value: new THREE.Color("#1f4f80") }, light: { value: 1 }, spec: { value: 2 },
+        fogColor: { value: new THREE.Color() }, fogNear: { value: 200 }, fogFar: { value: 800 },
+      },
+      vertexShader: `
+        uniform mat4 textureMatrix; varying vec4 vRefl; varying vec3 vWorld;
+        void main() { vec4 w = modelMatrix * vec4(position, 1.0); vWorld = w.xyz; vRefl = textureMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * viewMatrix * w; }`,
+      fragmentShader: `
+        uniform sampler2D tReflect, tColor; uniform float time, light, spec, fogNear, fogFar;
+        uniform vec3 sunDir, sunColor, waterColor, fogColor;
+        varying vec4 vRefl; varying vec3 vWorld;
+        float wave(vec2 p) {
+          return sin(p.x * 0.045 + time * 0.9) * 0.5 + sin(p.y * 0.06 - time * 0.7) * 0.5
+               + sin((p.x + p.y) * 0.11 + time * 1.3) * 0.25 + sin((p.x - p.y) * 0.21 - time * 1.7) * 0.15;
+        }
+        void main() {
+          vec2 p = vWorld.xz;
+          float dx = wave(p + vec2(1.0, 0.0)) - wave(p - vec2(1.0, 0.0));
+          float dz = wave(p + vec2(0.0, 1.0)) - wave(p - vec2(0.0, 1.0));
+          vec3 n = normalize(vec3(-dx * 0.35, 1.0, -dz * 0.35));
+          vec3 v = normalize(cameraPosition - vWorld);
+          float fres = 0.05 + 0.95 * pow(1.0 - max(dot(n, v), 0.0), 5.0);
+          vec3 refl = texture2D(tReflect, vRefl.xy / vRefl.w + n.xz * 0.03).rgb;
+          vec3 base = texture2D(tColor, p / 16.0).rgb * 0.3 + waterColor * 0.5;
+          vec3 col = mix(base * light, refl, clamp(fres + 0.2, 0.0, 1.0));
+          vec3 rs = reflect(-normalize(sunDir), n);
+          col += sunColor * pow(max(dot(rs, v), 0.0), 220.0) * spec;
+          float f = smoothstep(fogNear, fogFar, length(vWorld - cameraPosition));
+          gl_FragColor = vec4(mix(col, fogColor, f), 0.93);
+        }`,
+    });
+    const w = this.water, self = this;
+    const plane = new THREE.Plane(), clip = new THREE.Vector4(), q = new THREE.Vector4();
+    const mirrorPos = new THREE.Vector3(), camPos = new THREE.Vector3(), normal = new THREE.Vector3(), rot = new THREE.Matrix4();
+    const view = new THREE.Vector3(), look = new THREE.Vector3(), target = new THREE.Vector3();
+    w.material = this.waterFancy;
+    w.onBeforeRender = (renderer, scene, camera) => {
+      if (self.inReflection) return;
+      mirrorPos.setFromMatrixPosition(w.matrixWorld);
+      camPos.setFromMatrixPosition(camera.matrixWorld);
+      rot.extractRotation(w.matrixWorld);
+      normal.set(0, 0, 1).applyMatrix4(rot);
+      view.subVectors(mirrorPos, camPos);
+      if (view.dot(normal) > 0) return;
+      view.reflect(normal).negate().add(mirrorPos);
+      rot.extractRotation(camera.matrixWorld);
+      look.set(0, 0, -1).applyMatrix4(rot).add(camPos);
+      target.subVectors(mirrorPos, look).reflect(normal).negate().add(mirrorPos);
+      const vc = self.reflectCam;
+      vc.position.copy(view);
+      vc.up.set(0, 1, 0).applyMatrix4(rot).reflect(normal);
+      vc.lookAt(target);
+      vc.far = camera.far;
+      vc.updateMatrixWorld();
+      vc.projectionMatrix.copy(camera.projectionMatrix);
+      self.textureMatrix.set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1)
+        .multiply(vc.projectionMatrix).multiply(vc.matrixWorldInverse).multiply(w.matrixWorld);
+      // oblique near plane: nothing below the water ends up in the reflection
+      plane.setFromNormalAndCoplanarPoint(normal, mirrorPos).applyMatrix4(vc.matrixWorldInverse);
+      clip.set(plane.normal.x, plane.normal.y, plane.normal.z, plane.constant);
+      const e = vc.projectionMatrix.elements;
+      q.set((Math.sign(clip.x) + e[8]) / e[0], (Math.sign(clip.y) + e[9]) / e[5], -1, (1 + e[10]) / e[14]);
+      clip.multiplyScalar(2 / clip.dot(q));
+      e[2] = clip.x; e[6] = clip.y; e[10] = clip.z + 1; e[14] = clip.w;
+      const prevTarget = renderer.getRenderTarget(), prevShadow = renderer.shadowMap.autoUpdate;
+      self.inReflection = true;
+      w.visible = false;
+      renderer.shadowMap.autoUpdate = false;
+      renderer.setRenderTarget(self.reflectRT);
+      renderer.state.buffers.depth.setMask(true);
+      renderer.clear();
+      renderer.render(scene, vc);
+      renderer.setRenderTarget(prevTarget);
+      renderer.shadowMap.autoUpdate = prevShadow;
+      w.visible = true;
+      self.inReflection = false;
+    };
+    if (this.lookId) this.setLook(this.lookId, { keepCamera: true });
+  }
+
+  disableReflections() {
+    if (!this.waterFancy) return;
+    this.water.onBeforeRender = () => {};
+    this.water.material = this.waterSimple;
+    this.waterFancy.dispose(); this.reflectRT.dispose();
+    this.waterFancy = this.reflectRT = null;
   }
 
   /** A visible cone of light from above plus dust floating in it. */
@@ -725,6 +829,12 @@ export class McWorld {
     v.globalLight.intensity = look.player[0];
     v.cameraLight.intensity = look.player[1];
     this.applyBloom(look);
+    if (this.waterFancy) {
+      const u = this.waterFancy.uniforms;
+      u.sunDir.value.copy(s.sun); u.sunColor.value.set(s.sunColor);
+      u.waterColor.value.set(look.water ? look.water[0] : "#1f4f80"); u.light.value = look.water ? look.water[1] : 1; u.spec.value = look.water ? look.water[2] : 2;
+      u.fogColor.value.set(look.fog[0]); u.fogNear.value = look.fog[1]; u.fogFar.value = look.fog[2];
+    }
     // light shafts: real screen-space rays when available, else a soft sprite around the sun
     if (this.godRays) {
       this.godRays.enabled = !!look.rays;
@@ -746,6 +856,7 @@ export class McWorld {
 
   /** Per-frame motion (dust, stars, rays) and the automatic quality fallback. */
   tick() {
+    if (this.inReflection) return; // the mirror pass renders the scene a second time
     const dt = Math.min(0.1, this.clock.getDelta());
     const t = this.clock.elapsedTime;
     const cam = this.viewer.camera;
@@ -762,6 +873,7 @@ export class McWorld {
     }
     if (!reduce()) {
       this.sky.material.uniforms.time.value = t;
+      if (this.waterFancy) this.waterFancy.uniforms.time.value = t;
       if (this.rays && this.rays.visible) this.rays.material.rotation = t * 0.02;
       if (this.dustPoints && this.dustPoints.parent.visible) {
         const a = this.dustPoints.geometry.attributes.position;
@@ -781,6 +893,7 @@ export class McWorld {
     this.quality = "low";
     this.removeBloom();
     this.removeRays();
+    this.disableReflections();
     for (const l of [this.key, this.spot]) {
       if (!l) continue;
       l.shadow.mapSize.set(1024, 1024);
@@ -803,6 +916,7 @@ export class McWorld {
     for (const m of this.materials.values()) m.dispose();
     this.lookId = null;
     this.removeRays();
+    this.disableReflections();
     this.removeBloom();
     v.composer.removePass(this.output);
     this.output.dispose();
