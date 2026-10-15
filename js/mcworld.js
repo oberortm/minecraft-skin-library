@@ -73,12 +73,19 @@ function rng(seed) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
+/**
+ * Smooth noise that repeats every 16 pixels, so block faces tile without seams.
+ * n(x, y, sx, sy, off): pixel position, feature size in pixels (x and y), offset to vary the pattern.
+ */
 function valueNoise(seed) {
   const h = (x, y) => { const n = Math.sin(x * 127.1 + y * 311.7 + seed * 74.7) * 43758.5453; return n - Math.floor(n); };
   const s = t => t * t * (3 - 2 * t);
-  return (x, y) => {
-    const xi = Math.floor(x), yi = Math.floor(y), xf = s(x - xi), yf = s(y - yi);
-    const a = h(xi, yi), b = h(xi + 1, yi), c = h(xi, yi + 1), d = h(xi + 1, yi + 1);
+  return (x, y, sx = 1, sy = sx, off = 0) => {
+    const cx = Math.max(1, Math.round(16 / sx)), cy = Math.max(1, Math.round(16 / sy));
+    const u = x * cx / 16, v = y * cy / 16;
+    const xi = Math.floor(u), yi = Math.floor(v), xf = s(u - xi), yf = s(v - yi);
+    const w = (a, c) => ((a % c) + c) % c, X0 = w(xi, cx), X1 = w(xi + 1, cx), Y0 = w(yi, cy), Y1 = w(yi + 1, cy);
+    const a = h(X0 + off, Y0), b = h(X1 + off, Y0), c = h(X0 + off, Y1), d = h(X1 + off, Y1);
     return a + (b - a) * xf + (c - a) * yf + (a - b - c + d) * xf * yf;
   };
 }
@@ -114,28 +121,93 @@ const LEAF = pal(["#22481a", "#2c5a20", "#376a27", "#43792f", "#4f8738"]);
 const SAND = pal(["#cfc38c", "#d8cd97", "#e0d6a3", "#e8dfb0"]);
 const WATER = pal(["#2a5596", "#2f5fa5", "#3568b2", "#3b72bd"]);
 
+// Our own block art: a few fixed shades per block, laid out in small structures (pebbles, cracks,
+// bark grooves, leaf clusters, ripples) so the faces read like hand-drawn 16x16 pixel art.
+const PEBBLE_DARK = hex("#4a3322"), PEBBLE_LIGHT = hex("#a07c5a");
+/** Pebbles and specks on dirt-like faces: a lighter pixel with a darker one below it. */
+function pebbles(seed, count) {
+  const r = rng(seed * 7 + 1), set = new Map();
+  for (let i = 0; i < count; i++) {
+    const x = Math.floor(r() * 16), y = Math.floor(r() * 16);
+    set.set(x + y * 16, PEBBLE_LIGHT); set.set(x + ((y + 1) % 16) * 16, PEBBLE_DARK);
+    if (r() < 0.4) set.set(((x + 1) % 16) + y * 16, PEBBLE_LIGHT);
+  }
+  return set;
+}
+const dirtAt = (x, y, r, n, peb) => peb.get(x + y * 16) || pick(DIRT, n(x / 2.6, y / 2.6) * 0.55 + r() * 0.45);
+function grassAt(x, y, r, n) {
+  // patches of lighter and darker grass with short blade strokes
+  let v = n(x / 3, y / 3) * 0.6 + n(x / 1.3 + 9, y / 1.3) * 0.25 + r() * 0.2;
+  if ((x * 7 + y * 3) % 11 === 0) v += 0.25;
+  if ((x * 5 + y * 13) % 17 === 0) v -= 0.3;
+  return pick(GRASS, v);
+}
+/** Stone cracks: short darker strokes with a lighter rim above, fixed per texture. */
+function cracks(seed) {
+  const r = rng(seed * 3 + 5), m = new Map();
+  for (let k = 0; k < 7; k++) {
+    let x = Math.floor(r() * 16), y = Math.floor(r() * 16);
+    const len = 2 + Math.floor(r() * 4);
+    for (let i = 0; i < len; i++) {
+      m.set(x + y * 16, -1);
+      if (!m.has(x + ((y + 15) % 16) * 16)) m.set(x + ((y + 15) % 16) * 16, 1);
+      x = (x + 1) % 16; if (r() < 0.35) y = (y + (r() < 0.5 ? 1 : 15)) % 16;
+    }
+  }
+  return m;
+}
+
 const TEX = {
-  grassTop: s => paint(s, (x, y, r, n) => pick(GRASS, n(x / 2.2, y / 2.2) * 0.65 + r() * 0.35)),
-  grassSide: s => paint(s, (x, y, r, n) => {
-    // grass hangs over the top edge in short irregular drips
-    const drip = 2 + Math.floor(n(x * 1.3, 0.5) * 2.6) + (r() < 0.18 ? 1 : 0);
-    if (y < drip) return pick(GRASS, n(x / 2, y / 2) * 0.6 + r() * 0.4);
-    return pick(DIRT, n(x / 2.4, y / 2.4) * 0.6 + r() * 0.4);
+  grassTop: s => paint(s, grassAt),
+  grassSide: s => { const peb = pebbles(s, 9); return paint(s, (x, y, r, n) => {
+    // grass hangs over the top edge in irregular drips, with a darker rim where it ends
+    const drip = 3 + Math.floor(n(x, 0, 1.4, 16, 3) * 2.4) + (r() < 0.12 ? 2 : 0) - (x % 5 === 2 ? 1 : 0);
+    if (y < drip) return grassAt(x, y, r, n);
+    if (y === drip) return shade(pick(GRASS, 0.05), 0.82);
+    return dirtAt(x, y, r, n, peb);
+  }); },
+  dirt: s => { const peb = pebbles(s, 12); return paint(s, (x, y, r, n) => dirtAt(x, y, r, n, peb)); },
+  stone: s => { const cr = cracks(s); return paint(s, (x, y, r, n) => {
+    const c = cr.get(x + y * 16);
+    if (c === -1) return STONE[0];
+    if (c === 1) return STONE[4];
+    return pick(STONE, n(x, y, 4, 2.6) * 0.55 + n(x, y, 1.5, 1.5, 4) * 0.25 + r() * 0.2 + 0.05);
+  }); },
+  sand: s => paint(s, (x, y, r, n) => {
+    const v = r();
+    if (v < 0.06) return hex("#b9ab78");     // darker grains
+    if (v > 0.95) return hex("#f2ebc4");     // bright grains
+    return pick(SAND, n(x, y, 3, 3) * 0.5 + r() * 0.5);
   }),
-  dirt: s => paint(s, (x, y, r, n) => pick(DIRT, n(x / 2.4, y / 2.4) * 0.6 + r() * 0.4)),
-  stone: s => paint(s, (x, y, r, n) => pick(STONE, n(x / 3.5, y / 2.5) * 0.75 + r() * 0.25)),
-  sand: s => paint(s, (x, y, r, n) => pick(SAND, n(x / 2, y / 2) * 0.5 + r() * 0.5)),
-  logSide: s => paint(s, (x, y, r, n) => pick(BARK, n(x * 0.9, y / 7) * 0.7 + r() * 0.3)),
+  logSide: s => paint(s, (x, y, r, n) => {
+    // vertical bark ridges and grooves, an occasional knot
+    const ridge = n(x, 0, 1.2, 16, 5) + Math.sin(x * Math.PI * 10 / 16 + n(0, y, 16, 6, 7) * 2) * 0.25;
+    if ((x === 3 || x === 9 || x === 13) && n(x, y, 1, 3, 2) > 0.35) return BARK[0];
+    const knot = Math.hypot(x - 10.5, y - 6.5) < 1.6;
+    if (knot) return Math.hypot(x - 10.5, y - 6.5) < 0.8 ? BARK[0] : BARK[3];
+    return pick(BARK, ridge * 0.6 + n(x, y, 1, 5, 4) * 0.2 + r() * 0.2);
+  }),
   logTop: s => paint(s, (x, y, r) => {
-    const d = Math.max(Math.abs(x - 7.5), Math.abs(y - 7.5));
-    if (d > 6.5) return pick(BARK, r());
-    return pick(WOOD, (Math.floor(d) % 2 ? 0.25 : 0.7) + r() * 0.3);
+    const dx = Math.abs(x - 7.5), dy = Math.abs(y - 7.5);
+    if (Math.max(dx, dy) > 6.5) return pick(BARK, 0.3 + r() * 0.5);
+    const d = Math.cbrt(dx ** 3 + dy ** 3);   // rounded square rings
+    if (d < 1.2) return WOOD[0];
+    return pick(WOOD, (Math.floor(d / 1.6) % 2 ? 0.1 : 0.7) + r() * 0.25);
   }),
   leaves: s => paint(s, (x, y, r, n) => {
-    if (r() < 0.09) return [0, 0, 0, 0];
-    return pick(LEAF, n(x / 1.8, y / 1.8) * 0.6 + r() * 0.4);
+    // leaves as small clusters: a light tip, a mid body and a dark shadow under it; a few gaps
+    const ox = (x + 2 * (Math.floor(y / 4) % 2)) % 4, oy = y % 4;
+    if (r() < 0.09 && (ox === 3 || oy === 3)) return [0, 0, 0, 0];
+    let v = n(x, y, 4, 4) * 0.35 + r() * 0.2 + 0.3;
+    if (ox === 0 && oy === 0) v += 0.4; else if (ox <= 1 && oy <= 1) v += 0.15; else if (ox === 3 || oy === 3) v -= 0.35;
+    return pick(LEAF, v);
   }),
-  water: s => paint(s, (x, y, r, n) => pick(WATER, n(x / 3, y / 1.5) * 0.7 + r() * 0.3)),
+  water: s => paint(s, (x, y, r, n) => {
+    // soft horizontal ripples with bright crests
+    const w = Math.sin((y + n(x, y, 3, 4) * 3) * Math.PI * 6 / 16);
+    if (w > 0.93 && r() < 0.7) return hex("#5b8fd6");
+    return pick(WATER, (w + 1) * 0.35 + r() * 0.25);
+  }),
   quartz: s => paint(s, (x, y, r) => {
     let f = 0.96 + r() * 0.04;
     if (x === 0 || y === 0) f *= 1.04;
@@ -157,7 +229,7 @@ const TEX = {
     return shade(hex("#ecebe5"), f);
   }),
   dark: s => paint(s, (x, y, r, n) => {
-    const crack = Math.abs(n(x / 3, y / 3) - 0.5) < 0.04 ? 0.6 : 1;
+    const crack = Math.abs(n(x, y, 3, 3) - 0.5) < 0.04 ? 0.6 : 1;
     return shade(hex("#2b2830"), (0.8 + r() * 0.35) * crack);
   }),
   darkBrick: s => paint(s, (x, y, r) => {
@@ -184,7 +256,7 @@ const TEX = {
     const edge = x === 0 || y === 0 || x === 15 || y === 15;
     return edge ? shade(hex("#d9d6cd"), 0.95 + r() * 0.05) : shade(hex("#fffaf0"), 0.97 + r() * 0.03);
   }),
-  glowAmber: s => paint(s, (x, y, r, n) => shade(hex("#ffc163"), 0.7 + r() * 0.3 + n(x / 2, y / 2) * 0.3)),
+  glowAmber: s => paint(s, (x, y, r, n) => shade(hex("#ffc163"), 0.7 + r() * 0.3 + n(x, y, 2, 2) * 0.3)),
   glowCyan: s => paint(s, (x, y, r) => {
     const d = Math.max(Math.abs(x - 7.5), Math.abs(y - 7.5));
     const ring = d > 5.5 ? 0.62 : d > 3.5 ? 1.05 : 0.85;
@@ -1093,3 +1165,6 @@ function dedupe(cells) {
   for (const c of cells) m.set(c[1] + "," + c[2] + "," + c[3], c);
   return [...m.values()];
 }
+
+/** Our block drawings, for tests and texture sheets. */
+export const BLOCK_TEXTURES = TEX;

@@ -2,6 +2,9 @@
 // Textures are drawn here by default; when the user picked Minecraft's own textures or a pack
 // (js/pack.js), those are used instead. The choice is remembered for all skins.
 
+import { drawElytra, drawArmor, drawTrim, drawGlint, drawItem, drawShield } from "./equipart.js";
+export { drawElytra, drawGlint };
+
 const KEY = "skin-library-equipment";
 
 export function defaultEquipment() {
@@ -41,27 +44,6 @@ function canvas(w, h) {
   ctx.imageSmoothingEnabled = false;
   return [c, ctx];
 }
-function rng(seed) {
-  return () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
-}
-
-/**
- * Our own elytra texture (64x32, wings at 22,0 like the game's layout): grey-violet membrane,
- * darker feather lines towards the tips. Original drawing, not taken from the game.
- */
-export function drawElytra() {
-  const [c, ctx] = canvas(64, 32), r = rng(7);
-  for (let y = 0; y < 22; y++) for (let x = 22; x < 46; x++) {
-    const fx = (x - 22) % 12, tip = y / 22;
-    let v = 0.78 + r() * 0.08 - tip * 0.18;
-    if (fx % 3 === 0 && y > 3) v -= 0.12;          // feather lines
-    if (y > 17 && (x + y) % 2 === 0) v -= 0.08;     // ragged lower edge
-    const R = Math.round(140 * v), G = Math.round(136 * v), B = Math.round(168 * v);
-    ctx.fillStyle = `rgb(${R},${G},${B})`;
-    ctx.fillRect(x, y, 1, 1);
-  }
-  return c;
-}
 
 /** Put the elytra on or take it off. pack: { elytra: canvas } from the selected texture source, or null. */
 export async function applyElytra(viewer, on, pack) {
@@ -76,93 +58,6 @@ export const TRIM_PATTERNS = ["sentry", "dune", "coast", "wild", "ward", "eye", 
 export const TRIM_MATS = { quartz: "#e3d4c6", iron: "#cfcbca", netherite: "#5a4c4c", redstone: "#b0190a", copper: "#c4704f", gold: "#e6be3a", emerald: "#17c544", diamond: "#6eecd2", lapis: "#3f69b8", amethyst: "#a46fd8", resin: "#fc8c25" };
 
 export function emptyPiece() { return { mat: null, trim: null, trimMat: "gold", glint: false, dye: "#a06540" }; }
-
-/** Colours of our own armour drawings: [base, light, dark]. */
-const MAT_COLORS = {
-  leather: ["#a06540", "#c28156", "#6e4127"], chainmail: ["#8f9399", "#c3c7cc", "#4b4f55"], iron: ["#cfd2d6", "#f2f4f6", "#8e9298"],
-  gold: ["#e8c13f", "#fbe878", "#a8801c"], copper: ["#c96f4c", "#e99474", "#874230"], diamond: ["#4fd9cf", "#a9f6ef", "#2a8f8a"],
-  netherite: ["#4a4446", "#6b6365", "#2b2628"],
-};
-
-/**
- * Which pixels of the 64x32 armour layout are covered, per slot, in our own drawings.
- * Layer 1 (helmet, chestplate, boots) and layer 2 (leggings) use the old skin layout:
- * head 0,0 (8x8x8), body 16,16 (8x12x4), arm 40,16 (4x12x4), leg 0,16 (4x12x4).
- */
-function coverage(slot) {
-  const rects = [];
-  const box = (u, v, w, h, d, rows) => {
-    // rows(y) -> true where the side faces are covered (y counted from the top of the box)
-    for (let y = 0; y < h; y++) if (rows(y)) {
-      rects.push([u, v + d + y, d, 1], [u + d, v + d + y, w, 1], [u + d + w, v + d + y, d, 1], [u + 2 * d + w, v + d + y, w, 1]);
-    }
-  };
-  if (slot === "head") {
-    rects.push([8, 0, 8, 8], [16, 0, 8, 8]);                             // top, bottom rim
-    box(0, 0, 8, 8, 8, y => y < 3);                                      // band all round
-    rects.push([0, 8, 8, 8], [24, 8, 8, 8]);                              // both sides and the back fully
-    rects.push([8, 11, 1, 5], [15, 11, 1, 5]);                            // cheek guards beside the face
-  } else if (slot === "chest") {
-    box(16, 16, 8, 12, 4, y => y < 11);
-    rects.push([20, 16, 8, 4]);                                           // shoulders top
-    box(40, 16, 4, 12, 4, y => y < 5);                                    // shoulder pads
-    rects.push([44, 16, 4, 4]);
-  } else if (slot === "legs") {
-    box(16, 16, 8, 12, 4, y => y >= 7);                                   // hips
-    box(0, 16, 4, 12, 4, y => y < 9);
-  } else if (slot === "feet") {
-    box(0, 16, 4, 12, 4, y => y >= 8);
-    rects.push([8, 16, 4, 4]);                                            // soles
-  }
-  return rects;
-}
-
-/** Our own armour texture for one slot and material (64x32). */
-function drawArmor(slot, mat, dye) {
-  const [c, ctx] = canvas(64, 32), r = rng(ARMOR_MATS.indexOf(mat) * 31 + slot.length);
-  let [base, light, dark] = MAT_COLORS[mat];
-  if (mat === "leather" && dye) { base = dye; light = shadeHex(dye, 1.2); dark = shadeHex(dye, 0.65); }
-  const cov = coverage(slot);
-  for (const [x, y, w, h] of cov) {
-    for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
-      const px = x + i, py = y + j;
-      let col = base;
-      if (mat === "chainmail") col = (px + py) % 2 ? dark : (r() < 0.5 ? base : light);
-      else if (r() < 0.12) col = light;
-      else if (r() < 0.08) col = dark;
-      ctx.fillStyle = col; ctx.fillRect(px, py, 1, 1);
-    }
-  }
-  // darker outline along the lower edge of each covered band, lighter along the upper edge
-  for (const [x, y, w, h] of cov) {
-    ctx.fillStyle = dark; ctx.fillRect(x, y + h - 1, w, 1);
-  }
-  return c;
-}
-function shadeHex(h, f) {
-  const n = parseInt(h.slice(1), 16), ch = s => Math.max(0, Math.min(255, Math.round(((n >> s) & 255) * f)));
-  return `rgb(${ch(16)},${ch(8)},${ch(0)})`;
-}
-
-/** Our own trim drawing: a different simple ornament per pattern, coloured with the trim material. */
-function drawTrim(slot, pattern, color) {
-  const [c, ctx] = canvas(64, 32), k = TRIM_PATTERNS.indexOf(pattern);
-  const hit = (x, y) => {
-    switch (k % 6) {
-      case 0: return y % 4 === 0;                       // bands
-      case 1: return (x + y) % 5 === 0;                  // diagonals
-      case 2: return (x % 4 === 1) && (y % 3 !== 2);     // studs in columns
-      case 3: return Math.abs(((x % 8) - 3.5)) + (y % 6) === 5.5; // chevrons
-      case 4: return x % 6 === 0 || y % 6 === 0;          // grid
-      default: return (x * 3 + y * 7 + k) % 11 === 0;     // scattered marks
-    }
-  };
-  ctx.fillStyle = color;
-  for (const [x, y, w, h] of coverage(slot)) for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
-    if (hit(x + i + k, y + j)) ctx.fillRect(x + i, y + j, 1, 1);
-  }
-  return c;
-}
 
 /** Recolour a vanilla grayscale trim with the game's palettes (key palette -> material palette). */
 function paletteTrim(trim, key, pal) {
@@ -214,17 +109,6 @@ function pieceTexture(slot, piece, pack) {
   return c;
 }
 
-/** A purple enchantment shimmer texture (our own drawing): soft diagonal streaks. */
-export function drawGlint() {
-  const [c, ctx] = canvas(64, 64);
-  for (let y = 0; y < 64; y++) for (let x = 0; x < 64; x++) {
-    const v = Math.max(0, Math.sin((x + y * 0.6) / 64 * Math.PI * 4)) ** 3 * 0.9 + Math.max(0, Math.sin((x * 0.4 - y) / 64 * Math.PI * 6)) ** 4 * 0.5;
-    ctx.fillStyle = `rgb(${Math.round(150 * v)},${Math.round(80 * v)},${Math.round(230 * v)})`;
-    ctx.fillRect(x, y, 1, 1);
-  }
-  return c;
-}
-
 function boxUVs(geo, u, v, w, h, d, tw, th) {
   const f = (x1, y1, x2, y2) => [[x1 / tw, 1 - y2 / th], [x2 / tw, 1 - y2 / th], [x2 / tw, 1 - y1 / th], [x1 / tw, 1 - y1 / th]];
   const top = f(u + d, v, u + w + d, v + d), bottom = f(u + w + d, v, u + 2 * w + d, v + d);
@@ -255,7 +139,7 @@ export function applyArmor(viewer, THREE, armor, pack) {
   clearArmor(viewer);
   const skin = viewer.playerObject.skin, list = viewer.playerObject.userData.armor, slim = skin.slim;
   const glintTex = new THREE.CanvasTexture((pack && pack.glint_entity) || drawGlint());
-  glintTex.wrapS = glintTex.wrapT = THREE.RepeatWrapping; glintTex.userData.own = true;
+  glintTex.wrapS = glintTex.wrapT = THREE.RepeatWrapping; glintTex.repeat.set(2, 2); glintTex.userData.own = true;
   const texCache = new Map();
   const tex = (cv, color) => {
     const t = new THREE.CanvasTexture(cv);
@@ -301,7 +185,7 @@ export function applyArmor(viewer, THREE, armor, pack) {
     parent.add(mesh); list.push(mesh);
     if (piece.glint) {
       // the shimmer: same box, additive, sliding texture; masked to the armour by alpha test of the base
-      const g = new THREE.Mesh(geo.clone(), new THREE.MeshBasicMaterial({ map: glintTex, alphaMap: mask, alphaTest: 0.1, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+      const g = new THREE.Mesh(geo.clone(), new THREE.MeshBasicMaterial({ map: glintTex, alphaMap: mask, alphaTest: 0.1, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
       g.position.copy(mesh.position); g.scale.copy(mesh.scale).multiplyScalar(1.004);
       g.onBeforeRender = () => { glintTex.offset.set((performance.now() / 9000) % 1, (performance.now() / 14000) % 1); };
       parent.add(g); list.push(g);
@@ -314,12 +198,6 @@ export const TOOL_MATS = ["wood", "stone", "copper", "iron", "gold", "diamond", 
 /** Every item, with whether it comes in tool materials. Both hands can hold any of them. */
 export const ITEMS = { sword: true, axe: true, pickaxe: true, spear: true, mace: false, trident: false, bow: false, crossbow: false, shield: false, totem: false, torch: false, map: false };
 export function emptyHand() { return { item: null, mat: "iron", glint: false }; }
-const TOOL_COLORS = {
-  wood: ["#a07a46", "#c49a5e", "#6b4f2a"], stone: ["#8a8a8a", "#ababab", "#5e5e5e"], copper: ["#c96f4c", "#ec9a78", "#874230"],
-  iron: ["#d4d4d4", "#ffffff", "#8f8f8f"], gold: ["#f0cf4a", "#fff38a", "#b08a1e"], diamond: ["#4fe0d6", "#b4fff8", "#2a9a94"],
-  netherite: ["#4a4446", "#6e6668", "#2b2628"],
-};
-const WOOD = ["#8d6a3f", "#6b4a2a", "#4a3219"];
 /** Where the hand grips each 16x16 sprite (x, y in pixels). */
 const GRIP = { sword: [3, 12.5], axe: [3, 12.5], pickaxe: [3, 12.5], spear: [4, 11.5], mace: [3.5, 12], trident: [4, 11.5], bow: [9.5, 9.5], crossbow: [5, 10.5], totem: [8, 13], torch: [8, 14], map: [8, 12] };
 
@@ -337,105 +215,6 @@ export function itemFiles() {
     shield: [["entity/shield/shield_base_nopattern", "entity/shield_base_nopattern"]],
   });
   return out;
-}
-
-/** Our own 16x16 item drawings. Shapes follow the usual diagonal (handle bottom left, tip top right). */
-function drawItem(item, mat) {
-  const [c, ctx] = canvas(16, 16), r = rng(item.length * 7 + 3);
-  const px = (x, y, col) => { if (x >= 0 && y >= 0 && x < 16 && y < 16) { ctx.fillStyle = col; ctx.fillRect(x, y, 1, 1); } };
-  const [m, M, d] = TOOL_COLORS[mat] || TOOL_COLORS.iron;
-  const handle = (x0, x1) => { for (let x = x0; x <= x1; x++) { px(x, 15 - x, WOOD[0]); px(x + 1, 15 - x, WOOD[1]); } };
-  switch (item) {
-    case "sword":
-      for (let x = 5; x <= 15; x++) { px(x, 15 - x, M); px(x, 16 - x, m); px(x, 17 - x, d); }
-      px(15, 0, M); px(15, 1, d);
-      handle(1, 3); px(0, 15, d); px(1, 15, d); px(0, 14, d);
-      for (let k = -3; k <= 2; k++) px(5 + k, 11 + k, k === 0 ? M : d);
-      break;
-    case "pickaxe":
-      handle(1, 9);
-      for (let k = -6; k <= 6; k++) {
-        const b = Math.abs(k) >= 4 ? 1 : 0, x = 9 + k - b, y = 6 + k + b - 2 * b * Math.sign(k) * 0;
-        px(x, y, Math.abs(k) >= 5 ? d : m); px(x + 1, y - 1, Math.abs(k) <= 3 ? M : m);
-      }
-      break;
-    case "axe":
-      handle(1, 10);
-      for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
-        const s = x - y, dist = 15 - (x + y);
-        if (s >= -1 && s <= 7 && dist >= 1 && dist <= 5 && !(dist === 5 && (s <= 0 || s >= 6))) px(x, y, dist === 5 || dist === 4 && (s === -1 || s === 7) ? M : dist === 1 ? d : m);
-      }
-      break;
-    case "spear":
-      for (let x = 0; x <= 11; x++) { px(x, 15 - x, x % 3 ? WOOD[0] : WOOD[1]); }
-      for (let y = 0; y <= 5; y++) for (let x = 10; x < 16; x++) {
-        const w = x <= 11 ? 1 : x <= 13 ? 1 : 0, dd = x + y - 15;
-        if (Math.abs(dd) <= w && (x >= 11 || dd === 0)) px(x, y, dd < 0 ? M : dd > 0 ? d : m);
-      }
-      px(10, 5, d); px(11, 6, d); px(9, 4, d);
-      break;
-    case "mace":
-      handle(2, 7); px(1, 14, "#3a3a3a"); px(2, 14, "#3a3a3a");
-      for (let y = 2; y <= 7; y++) for (let x = 8; x <= 13; x++) px(x, y, (x + y) % 3 ? "#5b5b5f" : "#46464a");
-      for (const [x, y] of [[8, 2], [13, 2], [8, 7], [13, 7], [10, 1], [11, 1], [14, 4], [14, 5], [10, 8], [11, 8], [7, 4], [7, 5]]) px(x, y, "#a5a5ac");
-      px(10, 4, "#c9b26a"); px(11, 5, "#c9b26a");
-      break;
-    case "trident": {
-      const T = ["#3f8c7c", "#7cc9b4", "#245a4f"];
-      for (let x = 0; x <= 15; x++) { px(x, 15 - x, x > 11 ? T[1] : T[0]); if (x <= 11) px(x + 1, 15 - x, T[2]); }
-      for (const [x, y] of [[9, 2], [10, 3], [12, 5], [13, 6], [10, 1], [11, 0], [14, 5], [15, 4]]) px(x, y, T[1]);
-      px(11, 4, T[2]);
-      break;
-    }
-    case "bow":
-      for (let a = 0; a <= 90; a += 3) for (const rr of [12, 11]) {
-        const x = Math.round(2 + rr * Math.cos(a * Math.PI / 180)), y = Math.round(2 + rr * Math.sin(a * Math.PI / 180));
-        px(x, y, a > 35 && a < 55 ? WOOD[2] : rr === 12 ? WOOD[1] : WOOD[0]);
-      }
-      for (let x = 3; x <= 13; x++) px(x, 16 - x, "#dcdcdc");
-      break;
-    case "crossbow":
-      for (let x = 1; x <= 12; x++) { px(x, 15 - x, WOOD[1]); px(x + 1, 15 - x, WOOD[2]); }
-      for (let k = -5; k <= 5; k++) { const b = Math.floor(Math.abs(k) / 3); px(9 + k - b, 6 + k + b, WOOD[0]); }
-      for (let k = -4; k <= 4; k++) if (Math.abs(k) > 1) { const b = Math.abs(k) <= 2 ? 2 : 1; px(9 + k - b - 1, 6 + k + b + 1, "#cfcfcf"); }
-      px(9, 6, "#9a9a9a"); px(10, 5, "#9a9a9a"); px(3, 12, "#9a9a9a");
-      break;
-    case "totem": {
-      const G = ["#f2c94c", "#ffe98a", "#c99a2e"];
-      for (let y = 1; y <= 6; y++) for (let x = 5; x <= 10; x++) px(x, y, y === 1 ? G[1] : G[0]);
-      px(6, 3, "#16b84a"); px(9, 3, "#16b84a"); px(7, 5, G[2]); px(8, 5, G[2]);
-      for (let y = 7; y <= 12; y++) for (let x = 4; x <= 11; x++) px(x, y, x === 4 || x === 11 ? G[2] : G[0]);
-      for (let y = 8; y <= 11; y++) { px(2, y, G[1]); px(3, y, G[0]); px(12, y, G[0]); px(13, y, G[1]); }
-      for (let x = 6; x <= 9; x++) { px(x, 13, G[2]); px(x, 14, G[2]); }
-      px(7, 9, "#16b84a"); px(8, 9, "#16b84a");
-      break;
-    }
-    case "torch":
-      for (let y = 6; y <= 15; y++) { px(7, y, WOOD[0]); px(8, y, WOOD[1]); }
-      px(7, 4, "#ffe36a"); px(8, 4, "#fff3b0"); px(7, 5, "#ffb02a"); px(8, 5, "#ff8a1a"); px(7, 3, "#ffd23a");
-      break;
-    case "map":
-      for (let y = 1; y <= 14; y++) for (let x = 1; x <= 14; x++) {
-        const edge = x === 1 || y === 1 || x === 14 || y === 14;
-        px(x, y, edge ? "#b9a77f" : r() < 0.45 ? "#e9dfc4" : r() < 0.5 ? "#8fb86a" : "#7fa6d9");
-      }
-      px(7, 7, "#d23a2a"); px(8, 7, "#d23a2a"); px(7, 8, "#d23a2a");
-      break;
-  }
-  return c;
-}
-
-/** Our own shield texture in the game's layout (64x64: plate at 0,0 12x22x1, handle at 26,0 2x6x6). */
-function drawShield() {
-  const [c, ctx] = canvas(64, 64), r = rng(11);
-  for (let y = 0; y < 24; y++) for (let x = 0; x < 28; x++) {
-    ctx.fillStyle = (x % 4 === 0) ? "#6b4a2a" : r() < 0.2 ? "#9a7546" : "#8a663b"; ctx.fillRect(x, y, 1, 1);
-  }
-  ctx.fillStyle = "#9da3a8";                                              // iron rim and boss on the front
-  ctx.fillRect(1, 1, 12, 1); ctx.fillRect(1, 22, 12, 1); ctx.fillRect(1, 1, 1, 22); ctx.fillRect(12, 1, 1, 22);
-  ctx.fillRect(6, 10, 2, 3);
-  ctx.fillStyle = "#4a3219"; ctx.fillRect(26, 0, 16, 12);
-  return c;
 }
 
 /** Turn a sprite into a solid 1-pixel-thick model, like the game shows held items. 16 units wide. */
