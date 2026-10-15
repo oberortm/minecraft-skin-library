@@ -8,7 +8,8 @@ import { reveal, bindTilt, trackScroll, splitTitle } from "./motion.js";
 import { $, on, safe, setErrorReporter } from "./dom.js";
 import { load3d } from "./view3d.js";
 
-const state = { skins: [], view: "front", filter: "all", sort: "new", search: "", current: null };
+// filters: slim/classic are "either", fav narrows to favourites; none active = all
+const state = { skins: [], view: "front", filters: { slim: false, classic: false, fav: false }, sort: "new", search: "", current: null };
 const UI_KEY = "skin-library-ui";
 
 // ---------- small helpers ----------
@@ -42,10 +43,40 @@ function seg(id, value, onChange) {
 }
 
 function saveUi() {
-  try { localStorage.setItem(UI_KEY, JSON.stringify({ view: state.view, filter: state.filter, sort: state.sort })); } catch (e) { /* ignore */ }
+  try { localStorage.setItem(UI_KEY, JSON.stringify({ view: state.view, filters: state.filters, sort: state.sort })); } catch (e) { /* ignore */ }
 }
 function loadUi() {
-  try { Object.assign(state, JSON.parse(localStorage.getItem(UI_KEY) || "{}")); } catch (e) { /* ignore */ }
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem(UI_KEY) || "{}") || {}; } catch (e) { /* ignore */ }
+  if (["front", "back", "tex"].includes(saved.view)) state.view = saved.view;
+  if (["new", "old", "name"].includes(saved.sort)) state.sort = saved.sort;
+  if (saved.filters && typeof saved.filters === "object") for (const k of Object.keys(state.filters)) state.filters[k] = !!saved.filters[k];
+  else if (saved.filter in state.filters) state.filters[saved.filter] = true; // older versions had one filter
+}
+
+function matchesFilters(s) {
+  const f = state.filters;
+  if ((f.slim || f.classic) && !((f.slim && s.model === "slim") || (f.classic && s.model === "classic"))) return false;
+  return !f.fav || s.fav;
+}
+
+/** All | Slim | Classic | star: the last three combine freely, All clears them. */
+function setupFilters() {
+  const root = $("filterSeg");
+  const sync = () => {
+    const none = !Object.values(state.filters).some(Boolean);
+    root.querySelectorAll("button[data-v]").forEach(b =>
+      b.setAttribute("aria-pressed", String(b.dataset.v === "all" ? none : !!state.filters[b.dataset.v])));
+  };
+  sync();
+  root.addEventListener("click", e => {
+    const b = e.target.closest("button[data-v]");
+    if (!b) return;
+    const v = b.dataset.v;
+    if (v === "all") for (const k of Object.keys(state.filters)) state.filters[k] = false;
+    else state.filters[v] = !state.filters[v];
+    sync(); saveUi(); renderGrid();
+  });
 }
 
 function download(href, filename) {
@@ -59,7 +90,7 @@ const safeName = s => (s || "skin").replace(/[^\p{L}\p{N}_\- ]+/gu, "").trim().r
 function visibleSkins() {
   const q = state.search.trim().toLowerCase();
   let list = state.skins.filter(s =>
-    (state.filter === "all" || (state.filter === "fav" ? s.fav : s.model === state.filter)) &&
+    matchesFilters(s) &&
     (!q || s.name.toLowerCase().includes(q)));
   const by = {
     new: (a, b) => b.created - a.created,
@@ -440,7 +471,7 @@ async function boot() {
   safe("title", () => { splitTitle(document.querySelector(".top h1")); trackScroll(); });
   safe("toolbar", () => {
     seg("viewSeg", state.view, v => { state.view = v; saveUi(); renderGrid(); });
-    seg("filterSeg", state.filter, v => { state.filter = v; saveUi(); renderGrid(); });
+    setupFilters();
     $("sortSelect").value = state.sort;
     on("sortSelect", "change", e => { state.sort = e.target.value; saveUi(); renderGrid(); });
     on("searchInput", "input", e => { state.search = e.target.value; renderGrid(); });
