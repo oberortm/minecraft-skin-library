@@ -26,7 +26,24 @@ const FILES = {
   darkPolished: [["block/polished_blackstone", "block/polished_deepslate", "blocks/stone_andesite_smooth"]],
   // equipment for the presentation figure
   elytra: [["entity/equipment/wings/elytra", "entity/elytra"]],
+  glint_entity: [["misc/enchanted_glint_armor", "misc/enchanted_glint_entity", "misc/enchanted_item_glint"]],
+  glint_item: [["misc/enchanted_glint_item", "misc/enchanted_item_glint"]],
+  pal_key: [["trims/color_palettes/trim_palette"]],
 };
+// armour: 1.21.2+ equipment files first, then the older models/armor names
+for (const [m, old] of [["leather", "leather"], ["chainmail", "chainmail"], ["iron", "iron"], ["gold", "gold"], ["copper", "copper"], ["diamond", "diamond"], ["netherite", "netherite"]]) {
+  FILES["armor_" + m] = [["entity/equipment/humanoid/" + m, "models/armor/" + old + "_layer_1"]];
+  FILES["armor2_" + m] = [["entity/equipment/humanoid_leggings/" + m, "models/armor/" + old + "_layer_2"]];
+}
+FILES.armor_leather_overlay = [["entity/equipment/humanoid/leather_overlay", "models/armor/leather_layer_1_overlay"]];
+FILES.armor2_leather_overlay = [["entity/equipment/humanoid_leggings/leather_overlay", "models/armor/leather_layer_2_overlay"]];
+for (const p of ["sentry", "dune", "coast", "wild", "ward", "eye", "vex", "tide", "snout", "rib", "spire", "wayfinder", "shaper", "silence", "raiser", "host", "flow", "bolt"]) {
+  FILES["trim_" + p] = [["trims/entity/humanoid/" + p, "trims/models/armor/" + p]];
+  FILES["trim2_" + p] = [["trims/entity/humanoid_leggings/" + p, "trims/models/armor/" + p + "_leggings"]];
+}
+for (const m of ["quartz", "iron", "netherite", "redstone", "copper", "gold", "emerald", "diamond", "lapis", "amethyst", "resin"]) {
+  FILES["pal_" + m] = [["trims/color_palettes/" + m]];
+}
 
 // ---------- tiny zip reader (stored + deflate), enough for resource packs ----------
 async function inflate(bytes) {
@@ -57,20 +74,20 @@ async function readZip(buf, wanted) {
   return out;
 }
 
-/** Turn a pack image into a square canvas (first frame of animations), tinted where the game tints it. */
+/** Turn a pack image into a canvas (first frame of tall animation strips), tinted where the game tints it. */
 async function toCanvas(blob, tint) {
   const bmp = await createImageBitmap(blob);
-  const s = bmp.width;
+  const w = bmp.width, h = Math.min(bmp.width, bmp.height);
   const c = document.createElement("canvas");
-  c.width = c.height = s;
+  c.width = w; c.height = h;
   const ctx = c.getContext("2d");
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(bmp, 0, 0, s, s, 0, 0, s, s);
+  ctx.drawImage(bmp, 0, 0, w, h, 0, 0, w, h);
   if (tint) {
     ctx.globalCompositeOperation = "multiply";
-    ctx.fillStyle = tint; ctx.fillRect(0, 0, s, s);
+    ctx.fillStyle = tint; ctx.fillRect(0, 0, w, h);
     ctx.globalCompositeOperation = "destination-in";
-    ctx.drawImage(bmp, 0, 0, s, s, 0, 0, s, s);
+    ctx.drawImage(bmp, 0, 0, w, h, 0, 0, w, h);
   }
   bmp.close && bmp.close();
   return c;

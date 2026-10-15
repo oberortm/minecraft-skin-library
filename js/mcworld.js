@@ -536,7 +536,13 @@ export class McWorld {
   /** Skin meshes cast shadows; the skin texture is sRGB like the block textures. */
   player(on) {
     const v = this.viewer;
-    v.playerObject.traverse(o => { if (o.isMesh) { o.castShadow = on; o.receiveShadow = false; } });
+    v.playerObject.traverse(o => {
+      if (!o.isMesh) return;
+      o.castShadow = on && o.material.blending === THREE.NormalBlending; o.receiveShadow = false;
+      // armour and items from equipment.js are colour textures like the skin
+      const m = o.material.map;
+      if (m && m.userData.equipment) { m.colorSpace = on ? THREE.SRGBColorSpace : THREE.NoColorSpace; m.needsUpdate = true; }
+    });
     for (const t of [v.skinTexture, v.capeTexture]) {
       if (t) { t.colorSpace = on ? THREE.SRGBColorSpace : THREE.NoColorSpace; t.needsUpdate = true; }
     }

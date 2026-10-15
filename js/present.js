@@ -3,7 +3,7 @@ import { t, applyI18n } from "./i18n.js";
 
 import { $ } from "./dom.js";
 import { load3d } from "./view3d.js";
-import { loadEquipment, saveEquipment, applyElytra } from "./equipment.js";
+import { loadEquipment, saveEquipment, applyElytra, applyArmor, ARMOR_SLOTS, ARMOR_MATS, TRIM_PATTERNS, TRIM_MATS } from "./equipment.js";
 import { readPack, packCanvases, savePack, loadPack, SOURCES, downloadSource, selectedSource, selectSource } from "./pack.js";
 const KEY = "skin-library-present";
 const QUALITY_KEY = "skin-library-mc-quality";
@@ -141,14 +141,76 @@ function dropWorld() {
 async function applyEquipment() {
   const v = st.viewer;
   if (!v) return;
-  try { await applyElytra(v, st.equip.elytra, st.packTex); } catch (e) { console.error("[skin-library] equipment failed:", e); }
+  try {
+    await applyElytra(v, st.equip.elytra, st.packTex);
+    const kit = await load3d();
+    if (kit && st.viewer === v) applyArmor(v, kit.THREE, st.equip.armor, st.packTex);
+  } catch (e) { console.error("[skin-library] equipment failed:", e); }
   if (st.world) st.world.skinChanged();
 }
 function syncEquipUi() {
   $("eqElytra").checked = !!st.equip.elytra;
+  for (const slot of ARMOR_SLOTS) {
+    const p = st.equip.armor[slot], row = document.querySelector(`.eq-slot[data-slot="${slot}"]`);
+    row.querySelector(".eq-mat").value = p.mat || "";
+    row.querySelector(".eq-dye").value = p.dye;
+    row.querySelector(".eq-dye").hidden = p.mat !== "leather";
+    row.querySelector(".eq-trim").value = p.trim || "";
+    row.querySelector(".eq-trimmat").value = p.trimMat;
+    row.querySelector(".eq-trimmat").disabled = !p.trim || !p.mat;
+    row.querySelector(".eq-trim").disabled = !p.mat;
+    row.querySelector(".eq-glint").checked = !!p.glint;
+    row.querySelector(".eq-glint").disabled = !p.mat;
+  }
+}
+/** The armour rows: material (+ dye for leather), enchanted, trim pattern and trim material per piece. */
+function buildArmorUi() {
+  const opt = (v, key, text) => `<option value="${v}"${key ? ` data-i18n="${key}"` : ""}>${text || ""}</option>`;
+  const mats = opt("", "armorNone") + ARMOR_MATS.map(m => opt(m, "mat_" + m)).join("");
+  const trims = opt("", "trimNone") + TRIM_PATTERNS.map(p => opt(p, "", p[0].toUpperCase() + p.slice(1))).join("");
+  const tmats = Object.keys(TRIM_MATS).map(m => opt(m, "tmat_" + m)).join("");
+  $("eqArmor").innerHTML = `<h3 data-i18n="armor"></h3>` + ARMOR_SLOTS.map(slot => `
+    <div class="eq-slot" data-slot="${slot}" role="group" aria-labelledby="eq-${slot}">
+      <span class="pr-panel-label" id="eq-${slot}" data-i18n="armor_${slot}"></span>
+      <div class="pr-panel-row">
+        <select class="pr-select eq-mat" data-i18n-title="armorMaterial">${mats}</select>
+        <input type="color" class="eq-dye" data-i18n-title="dyeColor">
+        <label class="pr-check"><input type="checkbox" class="eq-glint"> <span data-i18n="enchanted"></span></label>
+      </div>
+      <div class="pr-panel-row">
+        <select class="pr-select eq-trim" data-i18n-title="trimPattern">${trims}</select>
+        <select class="pr-select eq-trimmat" data-i18n-title="trimMaterial">${tmats}</select>
+      </div>
+    </div>`).join("") + `<button class="pr-pill" id="eqAllSame" type="button" data-i18n="allSame" data-i18n-title="allSameHint"></button>`;
+  applyI18n($("eqArmor"));
+  $("eqArmor").addEventListener("input", e => {
+    const row = e.target.closest(".eq-slot");
+    if (!row) return;
+    const slot = row.dataset.slot, p = st.equip.armor[slot], el = e.target;
+    if (el.classList.contains("eq-mat")) {
+      p.mat = el.value || null;
+      // chestplate and elytra share the back, like in the game
+      if (slot === "chest" && p.mat && st.equip.elytra) { st.equip.elytra = false; if (st.anim === "fly") applyAnim("idle", true); }
+    } else if (el.classList.contains("eq-dye")) p.dye = el.value;
+    else if (el.classList.contains("eq-trim")) p.trim = el.value || null;
+    else if (el.classList.contains("eq-trimmat")) p.trimMat = el.value;
+    else if (el.classList.contains("eq-glint")) p.glint = el.checked;
+    st.lastSlot = slot;
+    saveEquipment(st.equip); syncEquipUi(); applyEquipment();
+  });
+  $("eqAllSame").addEventListener("click", () => {
+    // copy the piece changed last (or the first worn one) onto all four
+    const from = st.equip.armor[st.lastSlot] && st.equip.armor[st.lastSlot].mat ? st.lastSlot : ARMOR_SLOTS.find(s => st.equip.armor[s].mat);
+    if (!from) return;
+    for (const s of ARMOR_SLOTS) st.equip.armor[s] = { ...st.equip.armor[from] };
+    if (st.equip.elytra) { st.equip.elytra = false; if (st.anim === "fly") applyAnim("idle", true); }
+    saveEquipment(st.equip); syncEquipUi(); applyEquipment();
+  });
 }
 function setElytra(on) {
   st.equip.elytra = on;
+  // the elytra takes the chestplate's place
+  if (on) st.equip.armor.chest.mat = null;
   saveEquipment(st.equip);
   syncEquipUi();
   if (!on && st.anim === "fly") applyAnim("idle", true);
@@ -525,6 +587,7 @@ export function setupPresentation() {
   $("prWorld").addEventListener("click", () => togglePanel());
   $("prEquip").addEventListener("click", () => toggleEquipPanel());
   $("eqElytra").addEventListener("change", e => setElytra(e.target.checked));
+  buildArmorUi();
   document.addEventListener("pointerdown", e => {
     if (!$("prEquipPanel").hidden && !e.target.closest("#prEquipPanel, #prEquip")) toggleEquipPanel(false);
   }, true);
