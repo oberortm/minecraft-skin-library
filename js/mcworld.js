@@ -183,7 +183,7 @@ function skyMaterial() {
           float crater = hash(vec3(cell, 3.0)) > 0.72 ? 0.78 : 1.0;
           disc *= crater;
         }
-        col += sunColor * (disc * (moon > 0.5 ? 1.6 : 7.0) + pow(c, 220.0) * glow * 1.6 + pow(c, 18.0) * glow * 0.45 + pow(c, 4.0) * glow * 0.12);
+        col += sunColor * (disc * (moon > 0.5 ? 1.6 : 2.2) + pow(c, 220.0) * glow * 0.9 + pow(c, 18.0) * glow * 0.45 + pow(c, 4.0) * glow * 0.12);
         if (stars > 0.0 && h > -0.02) {
           vec3 p = floor(d * 260.0);
           float r = hash(p);
@@ -229,6 +229,7 @@ function raysTexture() {
 }
 
 // ---------- scene looks ----------
+const SUNRISE_AZ = -2.7; // the island stays low towards the rising sun so it is never hidden behind hills
 const sunAt = (azimuth, elevation) => new THREE.Vector3(
   Math.cos(elevation) * Math.sin(azimuth), Math.sin(elevation), Math.cos(elevation) * Math.cos(azimuth));
 
@@ -251,10 +252,10 @@ const LOOKS = {
   },
   "mc-sunrise": {
     set: "land", exposure: 1.0,
-    sky: { top: "#3a5a92", horizon: "#ffb27a", bottom: "#c88a6a", sun: sunAt(-2.7, 0.07), sunColor: "#ffc48a", sunSize: 0.032, glow: 1.6 },
+    sky: { top: "#3a5a92", horizon: "#ffb27a", bottom: "#c88a6a", sun: sunAt(SUNRISE_AZ, 0.09), sunColor: "#ffc896", sunSize: 0.03, glow: 0.9 },
     fog: ["#f2b48a", 180, 760], hemi: ["#a8c4ff", "#7a5236", 0.72],
-    key: { dir: sunAt(-2.7, 0.2), color: "#ffb36b", intensity: 2.6 }, fill: 0.25,
-    bloom: [0.55, 0.6, 0.78], player: [0.2, 0.45], rays: true,
+    key: { dir: sunAt(SUNRISE_AZ, 0.2), color: "#ffb36b", intensity: 2.4 }, fill: 0.3,
+    bloom: [0.4, 0.55, 0.85], player: [0.2, 0.45], rays: true, faceSun: true,
   },
   "mc-night": {
     set: "land", exposure: 1.35,
@@ -471,7 +472,8 @@ export class McWorld {
       if (d <= 5.5) return 0;
       const shore = Math.max(0, (d - (R - 4.5)) / 4.5);
       const ramp = Math.min(1, (d - 5.5) / 4);
-      const hills = ((n(x / 5, z / 5) - 0.4) * 2.6 + (d > 9 ? (d - 9) * 0.22 : 0)) * ramp;
+      const towardsSun = Math.abs(Math.atan2(Math.sin(Math.atan2(x, z) - SUNRISE_AZ), Math.cos(Math.atan2(x, z) - SUNRISE_AZ))) < 0.75;
+      const hills = ((n(x / 5, z / 5) - 0.4) * 2.6 + (d > 9 ? (d - 9) * 0.22 : 0)) * ramp * (towardsSun ? 0.15 : 1);
       return Math.round(Math.max(-1, Math.min(4, hills * Math.max(0, 1 - shore) - shore * 2.4)));
     };
     const tops = new Map();
@@ -489,6 +491,7 @@ export class McWorld {
     // trees outside the camera's orbit so they never block the view of the figure
     const spots = [[11, 3], [-10, 8], [6, -12], [-12, -5], [3, 13], [-5, -12], [13, -6], [-13, 2]];
     for (const [x, z] of spots) {
+      if (Math.abs(Math.atan2(Math.sin(Math.atan2(x, z) - SUNRISE_AZ), Math.cos(Math.atan2(x, z) - SUNRISE_AZ))) < 0.75) continue;
       const h = tops.get(x + "," + z);
       if (h === undefined || h < 0) continue;
       const trunk = 4 + Math.floor(r() * 2);
@@ -624,6 +627,14 @@ export class McWorld {
     const v = this.viewer, r = v.renderer;
     for (const g of Object.values(this.sets)) g.visible = false;
     this.set(look.set).visible = true;
+    if (look.faceSun) {
+      // start with the sun in view, a little beside the figure
+      const v0 = this.viewer, dist = v0.camera.position.distanceTo(v0.controls.target);
+      const cam = v0.camera, halfW = Math.atan(Math.tan(cam.fov * Math.PI / 360) * cam.aspect);
+      const a = SUNRISE_AZ + Math.PI + Math.min(0.3, halfW * 0.45);
+      v0.camera.position.set(Math.sin(a), 0.16, Math.cos(a)).normalize().multiplyScalar(dist).add(v0.controls.target);
+      v0.controls.update();
+    }
     if (look.lanterns) this.set("lanterns").visible = true;
     if (look.fireflies) this.set("fireflies").visible = true;
     if (look.spot) this.set("beam").visible = true;
@@ -652,7 +663,7 @@ export class McWorld {
     if (look.rays) {
       if (!this.rays) {
         this.raysTex = raysTexture();
-        this.rays = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.raysTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.75, fog: false }));
+        this.rays = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.raysTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.38, fog: false }));
         this.rays.scale.set(1300, 1300, 1);
         this.disposables.push(this.raysTex, this.rays.material);
         this.root.add(this.rays);
