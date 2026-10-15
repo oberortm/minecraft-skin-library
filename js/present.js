@@ -12,8 +12,9 @@ export const SCENES = {
   classic: [
     { id: "studio", amb: ["#ffffff", 1.0], cam: ["#ffffff", 1.0], fx: null },
     { id: "spotlight", amb: ["#ffffff", 0.5], cam: ["#fff1d6", 2.4], fx: "dust" },
-    { id: "sunset", amb: ["#ffb38a", 0.85], cam: ["#ff9a4d", 1.45], fx: "embers" },
-    { id: "night", amb: ["#9ab8ff", 0.95], cam: ["#e2ecff", 1.6], fx: "stars" },
+    // the scene sets the mood; on the skin itself only a light warm/cool sheen, colours stay true
+    { id: "sunset", amb: ["#fff0e2", 0.95], cam: ["#ffd7b0", 1.15], fx: "embers" },
+    { id: "night", amb: ["#eaf0ff", 0.9], cam: ["#dde7ff", 1.1], fx: "stars" },
   ],
   minecraft: [{ id: "mc-white" }, { id: "mc-dark" }, { id: "mc-sunrise" }, { id: "mc-night" }],
 };
