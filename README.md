@@ -14,7 +14,11 @@ Persönliche Minecraft-Skin-Bibliothek im Browser: Skins per Drag & Drop sammeln
 - **Editor:** Standardmäßig malst du direkt auf der großen, drehbaren 3D-Figur; ein Rahmen zeigt den Pixel unter dem Mauszeiger. Umschaltbar auf die Textur-Ansicht (64×64 plus flache Vorder- und Rückseite), beide arbeiten auf derselben Textur mit gemeinsamem Rückgängig/Wiederholen. Stift, Radierer, Füllen (bleibt in der jeweiligen Fläche), Pipette, Drehen, Spiegeln (links und rechts gleichzeitig). Basis- und Außen-Ebene lassen sich einzeln ein- und ausblenden; du wählst, auf welche Ebene du malst. Ist die Außen-Ebene ausgeblendet, malst du auf die Basis darunter. Slim/Classic, neuer Skin startet auf einer neutralen Vorlage.
 - **Export:** Jeder Skin als PNG, dazu ein Hinweis, welches Spielermodell du im Launcher wählen musst.
 - **Backup:** Die ganze Bibliothek als JSON-Datei speichern und auf einem anderen Gerät wieder laden.
-- **Präsentationsmodus:** Ein Skin bildschirmfüllend in 3D, mit Pfeilen, Tastatur (← →) oder Wischen weiterblättern. Fünf Szenen mit eigener Beleuchtung (Studio, Spotlight, Golden hour, Neon, Moonlight), Animationen (Stehen, Gehen, Rennen, Fliegen), Drehen, Vollbild. Das Menü versteckt sich und kommt über den Menü-Button oben links zurück.
+- **Präsentationsmodus:** Ein Skin bildschirmfüllend in 3D, mit Pfeilen, Tastatur (← →) oder Wischen weiterblättern. Zwei Szenen-Gruppen, umschaltbar über „Classic | Minecraft“:
+  - *Classic:* Studio (weiß), Spotlight (schwarz), Golden hour (Sonnenuntergang), Moonlight (Nacht) als Bühnen-Hintergründe.
+  - *Minecraft:* dieselben vier Stimmungen als echte 3D-Blockwelt, in der der Skin steht: weißer Raum, dunkler Raum mit Lichtkegel und leuchtenden Blöcken, Sonnenaufgang über einer kleinen Insel, Nacht mit Mond, Sternen, Laternen und Glühwürmchen. Weiche Echtzeit-Schatten, ACES-Tonemapping, Nebel, Himmelsverlauf, Bloom und Sonnenstrahlen. Alle Block-Texturen werden im Code erzeugt (16×16 Pixel-Rauschen), es werden keine Spielgrafiken verwendet. Auf Handys und schwachen Geräten läuft automatisch eine leichtere Qualitätsstufe (kleinere Schatten, kein Bloom).
+  
+  Animationen (Stehen, Gehen, Rennen, Fliegen), Drehen, Vollbild. Gruppe und Szene werden gemerkt. Das Menü versteckt sich und kommt über den Menü-Button oben links zurück.
 - **Oberfläche:** Ein klarer Look mit 3D-Figuren in den Karten, Hell/Dunkel und Englisch/Deutsch per Knopfdruck im Header.
 
 ### Tastenkürzel im Editor
@@ -41,7 +45,8 @@ Auf dem Handy malt ein Finger, zwei Finger drehen und zoomen.
 | --- | --- |
 | `←` / `→` | Vorheriger / nächster Skin |
 | `Leertaste` | Drehen an/aus |
-| `1`–`5` | Szene wählen |
+| `1`–`4` | Szene der aktuellen Gruppe wählen |
+| `G` | Gruppe wechseln (Classic / Minecraft) |
 | `M` | Menü einblenden |
 | `Esc` | Präsentation beenden |
 
@@ -63,12 +68,12 @@ Dann http://localhost:8000 öffnen.
 
 ## Neue Version veröffentlichen (Cache-Busting)
 
-GitHub Pages lässt Browser Dateien bis zu 10 Minuten cachen. Damit nie altes und neues JavaScript gemischt wird, hängt an jeder CSS- und JS-URL eine Versionsnummer (derzeit `?v=6`). Alles steht in **einer** Datei, `index.html`: Stylesheets, Skripte und die Import-Map, die jedem Modul genau eine versionierte URL gibt (so entstehen keine doppelten Modul-Instanzen).
+GitHub Pages lässt Browser Dateien bis zu 10 Minuten cachen. Damit nie altes und neues JavaScript gemischt wird, hängt an jeder CSS- und JS-URL eine Versionsnummer (derzeit `?v=7`). Alles steht in **einer** Datei, `index.html`: Stylesheets, Skripte und die Import-Map, die jedem Modul genau eine versionierte URL gibt (so entstehen keine doppelten Modul-Instanzen).
 
-**Bei jedem Release die Nummer erhöhen**, z. B. von 6 auf 7:
+**Bei jedem Release die Nummer erhöhen**, z. B. von 7 auf 8:
 
 ```bash
-sed -i 's/?v=6"/?v=7"/g; s/name="app-version" content="6"/name="app-version" content="7"/' index.html
+sed -i 's/?v=7"/?v=8"/g; s/name="app-version" content="7"/name="app-version" content="8"/' index.html
 ```
 
 Neue Module in `js/` müssen zusätzlich in der Import-Map in `index.html` eingetragen werden. Die Bibliotheken in `vendor/` tragen ihre Version im Ordnernamen; skinview3d und der eigene Code holen sich `three` über dieselbe Import-Map-Zeile, damit nie zwei three.js-Kopien geladen werden. Startet ein Teil der App nicht (fehlendes Element, Fehler), laufen die anderen Knöpfe weiter und es erscheint ein Hinweis statt einer toten Seite.
@@ -88,6 +93,7 @@ js/skin.js          Skin-Geometrie, Rendering, Formatumwandlung
 js/fig3d.js         3D-Figuren aus CSS-Boxen für die Karten (ohne WebGL)
 js/motion.js        Einblenden beim Scrollen, Titel-Animation
 js/present.js       Präsentationsmodus
+js/mcworld.js       Minecraft-Szenen: Blockwelt, Licht, Schatten, Nebel, Bloom (nur bei Bedarf geladen)
 js/db.js            Speicher (IndexedDB)
 js/dom.js           Fehlertolerante DOM-Helfer für den Start
 js/i18n.js          Texte auf Deutsch und Englisch
@@ -110,6 +116,6 @@ Dieses Projekt ist nicht offiziell und steht in keiner Verbindung zu Mojang oder
 
 ## English
 
-A personal Minecraft skin library that runs entirely in your browser. Drop in PNG skins (64×64 or legacy 64×32), browse them front, back or as a texture, view them in 3D, paint your own directly on the 3D figure (or on the flat texture) in the built-in editor and export them as PNG. Everything is stored locally in IndexedDB; use the backup file to move your library to another device. Includes a full-screen presentation mode with lit scenes and animations, plus light/dark and English/German toggles. No build step: serve the folder with any static server.
+A personal Minecraft skin library that runs entirely in your browser. Drop in PNG skins (64×64 or legacy 64×32), browse them front, back or as a texture, view them in 3D, paint your own directly on the 3D figure (or on the flat texture) in the built-in editor and export them as PNG. Everything is stored locally in IndexedDB; use the backup file to move your library to another device. Includes a full-screen presentation mode with two scene groups (Classic backdrops, and Minecraft-style 3D block worlds with real-time shadows, fog and bloom, all textures generated in code) and animations, plus light/dark and English/German toggles. No build step: serve the folder with any static server. Every CSS/JS URL carries a version (`?v=N`, set in `index.html`); raise it on each release so browsers never mix cached old and new files.
 
 Not an official Minecraft product. Not approved by or associated with Mojang or Microsoft.

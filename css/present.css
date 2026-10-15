@@ -42,16 +42,32 @@ body.presenting .top .tagline { animation: none; }
   --pr-fg: #fff3e6; --pr-muted: rgba(255,243,230,.7); --pr-big: rgba(255,214,170,.10);
   --pr-shadow: rgba(10,4,8,.75); --pr-pool: rgba(255,150,80,.18); --pr-ui: rgba(30,12,24,.28); --pr-ui-line: rgba(255,220,190,.18); --pr-ui-on: #ffb067; --pr-ui-on-fg: #2a120a;
 }
-.present[data-scene="neon"] {
-  --pr-bg: radial-gradient(ellipse 80% 60% at 50% 30%, #2a0b4d 0%, #0b0620 55%, #04030c 100%);
-  --pr-fg: #fdf2ff; --pr-muted: rgba(253,242,255,.65); --pr-big: rgba(255,79,216,.18);
-  --pr-shadow: rgba(0,0,0,.8); --pr-pool: rgba(255,79,216,.35); --pr-ui: rgba(255,255,255,.07); --pr-ui-line: rgba(110,231,255,.25); --pr-ui-on: #ff4fd8; --pr-ui-on-fg: #1a0016;
-}
 .present[data-scene="night"] {
   --pr-bg: linear-gradient(180deg, #02060f 0%, #08142e 55%, #10244a 100%);
   --pr-fg: #e8f0ff; --pr-muted: rgba(232,240,255,.62); --pr-big: rgba(160,190,255,.08);
   --pr-shadow: rgba(0,4,15,.8); --pr-pool: rgba(150,185,255,.20); --pr-ui: rgba(255,255,255,.07); --pr-ui-line: rgba(180,205,255,.18); --pr-ui-on: #d6e4ff; --pr-ui-on-fg: #06122a;
 }
+
+/* Minecraft scenes: the 3D world fills the screen; these only colour the text and controls */
+.present[data-scene="mc-white"] {
+  --pr-bg: #f3f3f1; --pr-fg: #141416; --pr-muted: rgba(20,20,22,.66); --pr-ui: rgba(255,255,255,.7); --pr-ui-line: rgba(20,20,22,.12); --pr-ui-on: #141416; --pr-ui-on-fg: #fff;
+}
+.present[data-scene="mc-dark"] {
+  --pr-bg: #050408; --pr-fg: #f6f1e8; --pr-muted: rgba(246,241,232,.62); --pr-ui: rgba(20,18,26,.55); --pr-ui-line: rgba(255,255,255,.14); --pr-ui-on: #fff1d6; --pr-ui-on-fg: #120e08;
+}
+.present[data-scene="mc-sunrise"] {
+  --pr-bg: linear-gradient(180deg, #3a5a92, #ffb27a); --pr-fg: #fffaf2; --pr-muted: rgba(255,250,242,.82); --pr-ui: rgba(40,22,20,.32); --pr-ui-line: rgba(255,230,200,.25); --pr-ui-on: #ffcf9a; --pr-ui-on-fg: #2a120a;
+}
+.present[data-scene="mc-night"] {
+  --pr-bg: #03060f; --pr-fg: #e8f0ff; --pr-muted: rgba(232,240,255,.66); --pr-ui: rgba(6,12,28,.5); --pr-ui-line: rgba(180,205,255,.18); --pr-ui-on: #d6e4ff; --pr-ui-on-fg: #06122a;
+}
+.present[data-group="minecraft"] .pr-bg, .present[data-group="minecraft"] .pr-big, .present[data-group="minecraft"] .pr-floor, .present[data-group="minecraft"] .pr-fx { display: none; }
+.present[data-group="minecraft"] .pr-name { text-shadow: 0 2px 18px rgba(0,0,0,.35); }
+.present[data-scene="mc-white"] .pr-name { text-shadow: 0 1px 14px rgba(255,255,255,.7); }
+.present[data-group="minecraft"] .pr-count, .present[data-group="minecraft"] .pr-meta { text-shadow: 0 1px 8px rgba(0,0,0,.35); }
+.present[data-scene="mc-white"] .pr-count, .present[data-scene="mc-white"] .pr-meta { text-shadow: none; }
+.present[data-scene="mc-sunrise"] .pr-name { text-shadow: 0 2px 4px rgba(70,28,8,.45), 0 4px 30px rgba(70,28,8,.55); }
+.present[data-scene="mc-sunrise"] .pr-count, .present[data-scene="mc-sunrise"] .pr-meta { text-shadow: 0 1px 3px rgba(70,28,8,.6), 0 2px 12px rgba(70,28,8,.5); }
 
 .pr-bg, .pr-bg i { position: absolute; inset: 0; pointer-events: none; }
 .pr-bg i { opacity: 0; transition: opacity .9s ease; }
@@ -73,18 +89,6 @@ body.presenting .top .tagline { animation: none; }
   box-shadow: 0 0 60px 20px rgba(170,200,255,.25), 0 0 160px 60px rgba(120,160,255,.12);
 }
 [data-scene="night"] .pr-moon { opacity: 1; }
-.pr-bg .pr-grid { /* receding neon floor */
-  inset: auto; left: -50%; right: -50%; bottom: -10%; height: 55%;
-  background:
-    linear-gradient(rgba(255,79,216,.55) 2px, transparent 2px) 0 0 / 100% 60px,
-    linear-gradient(90deg, rgba(110,231,255,.45) 2px, transparent 2px) 0 0 / 60px 100%;
-  transform: perspective(500px) rotateX(68deg); transform-origin: 50% 0;
-  mask-image: linear-gradient(180deg, transparent, #000 25%, #000);
-  -webkit-mask-image: linear-gradient(180deg, transparent, #000 25%, #000);
-}
-[data-scene="neon"] .pr-grid { opacity: 1; animation: pr-grid 1.6s linear infinite; }
-@keyframes pr-grid { to { background-position: 0 60px, 0 0; } }
-
 .pr-fx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 
 /* giant name behind the figure, drifting */
@@ -95,7 +99,6 @@ body.presenting .top .tagline { animation: none; }
   transition: opacity .35s ease, filter .35s ease;
 }
 .pr-big span { padding-right: .2em; }
-[data-scene="neon"] .pr-big { -webkit-text-stroke-color: rgba(255,79,216,.35); text-shadow: 0 0 40px rgba(255,79,216,.25); }
 @keyframes pr-marquee { to { transform: translateX(-50%); } }
 
 /* floor: light pool and contact shadow */
@@ -128,7 +131,6 @@ body.presenting .top .tagline { animation: none; }
 }
 .pr-count { font: 600 13px var(--f-body); letter-spacing: .18em; color: var(--pr-muted); font-variant-numeric: tabular-nums; }
 .pr-name { margin: 0; font: 700 clamp(32px, 4.6vw, 76px)/.95 var(--f-display); letter-spacing: -.035em; overflow-wrap: anywhere; text-wrap: balance; }
-[data-scene="neon"] .pr-name { text-shadow: 0 0 24px rgba(255,79,216,.55), 0 0 2px #fff; }
 [data-scene="sunset"] .pr-name { text-shadow: 0 2px 30px rgba(255,120,60,.45); }
 .pr-meta { font: 500 15px var(--f-body); color: var(--pr-muted); white-space: pre; }
 
@@ -151,6 +153,10 @@ body.hdr-open .pr-menu { background: var(--pr-ui-on); color: var(--pr-ui-on-fg);
   position: absolute; left: 50%; bottom: max(22px, env(safe-area-inset-bottom, 0px)); translate: -50% 0; z-index: 3;
   display: grid; gap: 8px; justify-items: center; max-width: calc(100vw - 32px); transition: opacity .4s ease, transform .4s ease;
 }
+.pr-seg { display: inline-flex; border: 1px solid var(--pr-ui-line); background: var(--pr-ui); backdrop-filter: blur(14px) saturate(1.4); border-radius: 999px; padding: 3px; gap: 2px; }
+.pr-seg button { border: 0; background: transparent; color: var(--pr-fg); font: 600 12px var(--f-body); letter-spacing: .02em; padding: 6px 14px; border-radius: 999px; cursor: pointer; transition: background .3s, color .3s; }
+.pr-seg button[aria-pressed="true"] { background: var(--pr-ui-on); color: var(--pr-ui-on-fg); }
+.pr-seg button:focus-visible { outline: 2px solid var(--pr-fg); outline-offset: 2px; }
 .pr-row { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; align-items: center; }
 .pr-pill { display: inline-flex; align-items: center; gap: 7px; border-radius: 999px; padding: 8px 14px; font: 600 13px var(--f-body); }
 .pr-pill[aria-pressed="true"] { background: var(--pr-ui-on); color: var(--pr-ui-on-fg); border-color: transparent; }
@@ -158,7 +164,10 @@ body.hdr-open .pr-menu { background: var(--pr-ui-on); color: var(--pr-ui-on-fg);
 .sw-studio { background: linear-gradient(135deg, #ffffff, #c9ced6); }
 .sw-spotlight { background: radial-gradient(circle at 50% 20%, #fff1d6, #050506 70%); }
 .sw-sunset { background: linear-gradient(180deg, #6b2f63, #f6a356); }
-.sw-neon { background: linear-gradient(135deg, #ff4fd8, #6ee7ff); }
+.sw-mc-white { border-radius: 3px !important; background: linear-gradient(135deg, #ffffff 0 50%, #dcdad3 50%); }
+.sw-mc-dark { border-radius: 3px !important; background: radial-gradient(circle at 50% 30%, #fff1d6 0 18%, #2b2830 22%); }
+.sw-mc-sunrise { border-radius: 3px !important; background: linear-gradient(180deg, #3a5a92, #ffb27a 55%, #5f9d3d 56%); }
+.sw-mc-night { border-radius: 3px !important; background: linear-gradient(180deg, #03060f, #13213d 60%, #3f7f2c 61%); }
 .sw-night { background: radial-gradient(circle at 70% 30%, #dbe6ff 0 22%, #0b1a3d 24%); }
 .pr-icon:focus-visible, .pr-nav:focus-visible, .pr-pill:focus-visible { outline: 2px solid var(--pr-fg); outline-offset: 2px; }
 
@@ -177,6 +186,6 @@ body.hdr-open .pr-menu { background: var(--pr-ui-on); color: var(--pr-ui-on-fg);
   body.presenting .top { padding-left: 72px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .pr-big, .pr-beam, [data-scene="neon"] .pr-grid { animation: none !important; }
+  .pr-big, .pr-beam { animation: none !important; }
   .pr-stage, .pr-info { transition: none; }
 }

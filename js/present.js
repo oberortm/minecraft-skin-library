@@ -6,27 +6,40 @@ import { load3d } from "./view3d.js";
 const KEY = "skin-library-present";
 const reduce = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-export const SCENES = [
-  { id: "studio", amb: ["#ffffff", 1.0], cam: ["#ffffff", 1.0], fx: null },
-  { id: "spotlight", amb: ["#ffffff", 0.5], cam: ["#fff1d6", 2.4], fx: "dust" },
-  { id: "sunset", amb: ["#ffb38a", 0.85], cam: ["#ff9a4d", 1.45], fx: "embers" },
-  { id: "neon", amb: ["#9ef0ff", 0.95], cam: ["#ff6fe0", 2.0], fx: null },
-  { id: "night", amb: ["#9ab8ff", 0.95], cam: ["#e2ecff", 1.6], fx: "stars" },
-];
+// Two groups of four moods. Classic scenes are CSS backdrops behind the figure; Minecraft scenes
+// are real block worlds built into the 3D scene (js/mcworld.js, loaded on first use).
+export const SCENES = {
+  classic: [
+    { id: "studio", amb: ["#ffffff", 1.0], cam: ["#ffffff", 1.0], fx: null },
+    { id: "spotlight", amb: ["#ffffff", 0.5], cam: ["#fff1d6", 2.4], fx: "dust" },
+    { id: "sunset", amb: ["#ffb38a", 0.85], cam: ["#ff9a4d", 1.45], fx: "embers" },
+    { id: "night", amb: ["#9ab8ff", 0.95], cam: ["#e2ecff", 1.6], fx: "stars" },
+  ],
+  minecraft: [{ id: "mc-white" }, { id: "mc-dark" }, { id: "mc-sunrise" }, { id: "mc-night" }],
+};
+const GROUPS = Object.keys(SCENES);
+const groupOf = id => GROUPS.find(g => SCENES[g].some(s => s.id === id)) || "classic";
 const ANIMS = ["idle", "walk", "run", "fly"];
 
 const st = {
   on: false, list: [], i: 0, viewer: null, sv: null, base: null, scene: "studio", anim: "idle", rotate: true,
+  group: "classic", scenes: { classic: "studio", minecraft: "mc-sunrise" }, world: null, worldMod: null, token: 0,
   fx: { raf: 0, parts: [], mode: null }, idleTimer: 0, hdrTimer: 0, busy: false, onExit: null,
 };
 
 function prefs() {
-  try { Object.assign(st, JSON.parse(localStorage.getItem(KEY) || "{}")); } catch (e) { /* ignore */ }
-  if (!SCENES.some(s => s.id === st.scene)) st.scene = "studio";
-  if (!ANIMS.includes(st.anim)) st.anim = "idle";
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { /* ignore */ }
+  if (saved.scenes && typeof saved.scenes === "object") {
+    for (const g of GROUPS) if (SCENES[g].some(s => s.id === saved.scenes[g])) st.scenes[g] = saved.scenes[g];
+  } else if (SCENES.classic.some(s => s.id === saved.scene)) st.scenes.classic = saved.scene; // older versions kept a single scene
+  st.group = GROUPS.includes(saved.group) ? saved.group : "classic";
+  st.scene = st.scenes[st.group];
+  if (ANIMS.includes(saved.anim)) st.anim = saved.anim;
+  if (typeof saved.rotate === "boolean") st.rotate = saved.rotate;
 }
 function savePrefs() {
-  try { localStorage.setItem(KEY, JSON.stringify({ scene: st.scene, anim: st.anim, rotate: st.rotate })); } catch (e) { /* ignore */ }
+  try { localStorage.setItem(KEY, JSON.stringify({ group: st.group, scenes: st.scenes, anim: st.anim, rotate: st.rotate })); } catch (e) { /* ignore */ }
 }
 
 // ---------- 3D viewer ----------
@@ -53,18 +66,68 @@ async function initViewer() {
   return st.viewer;
 }
 
-function applyScene(id) {
-  st.scene = id;
-  const sc = SCENES.find(s => s.id === id);
+function renderSceneButtons() {
+  document.querySelectorAll("#prGroups button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.group === st.group)));
+  $("prScenes").replaceChildren(...SCENES[st.group].map(s => {
+    const b = document.createElement("button");
+    b.className = "pr-pill"; b.dataset.scene = s.id; b.id = "scene-" + s.id;
+    b.setAttribute("aria-pressed", String(s.id === st.scene));
+    b.innerHTML = `<i class="sw sw-${s.id}"></i><span data-i18n="scene_${s.id}"></span>`;
+    b.addEventListener("click", () => applyScene(s.id));
+    return b;
+  }));
+  applyI18n($("prScenes"));
+}
+
+async function applyScene(id) {
+  const group = groupOf(id);
+  const token = ++st.token;
+  const groupChanged = group !== st.group;
+  st.scene = id; st.group = group; st.scenes[group] = id;
   $("present").dataset.scene = id;
-  document.querySelectorAll("#prScenes button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.scene === id)));
-  const v = st.viewer;
-  if (v && st.base) {
-    v.globalLight.color.set(sc.amb[0]); v.globalLight.intensity = st.base.amb * sc.amb[1];
-    v.cameraLight.color.set(sc.cam[0]); v.cameraLight.intensity = st.base.cam * sc.cam[1];
-  }
-  startFx(sc.fx);
+  $("present").dataset.group = group;
+  if (groupChanged || !$("prScenes").children.length) renderSceneButtons();
+  else document.querySelectorAll("#prScenes button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.scene === id)));
   savePrefs();
+  const v = st.viewer;
+  if (group === "classic") {
+    dropWorld();
+    const sc = SCENES.classic.find(s => s.id === id);
+    if (v && st.base) {
+      v.globalLight.color.set(sc.amb[0]); v.globalLight.intensity = st.base.amb * sc.amb[1];
+      v.cameraLight.color.set(sc.cam[0]); v.cameraLight.intensity = st.base.cam * sc.cam[1];
+    }
+    startFx(sc.fx);
+    applyRotate(st.rotate);
+    return;
+  }
+  startFx(null);
+  if (!v) return;
+  v.globalLight.color.set("#ffffff"); v.cameraLight.color.set("#ffffff");
+  try {
+    if (!st.world) {
+      st.worldMod = st.worldMod || await import("./mcworld.js");
+      if (token !== st.token || !st.on) return;
+      st.world = new st.worldMod.McWorld(v);
+    }
+    st.world.setLook(id);
+    applyRotate(st.rotate);
+  } catch (e) {
+    console.error("[skin-library] block world failed:", e);
+    dropWorld();
+  }
+}
+
+/** Back to the plain viewer: remove the block world and free its memory. */
+function dropWorld() {
+  if (!st.world) return;
+  try { st.world.dispose(); } catch (e) { console.error("[skin-library] world cleanup failed:", e); }
+  st.world = null;
+}
+
+function toggleGroup() {
+  const next = st.group === "classic" ? "minecraft" : "classic";
+  applyScene(st.scenes[next]);
 }
 
 function applyAnim(id) {
@@ -82,7 +145,13 @@ function applyAnim(id) {
 function applyRotate(on) {
   st.rotate = on;
   $("prRotate").setAttribute("aria-pressed", String(on));
-  if (st.viewer) { st.viewer.autoRotate = on && !reduce(); st.viewer.autoRotateSpeed = 1.1; }
+  const v = st.viewer;
+  if (v) {
+    // in a block world the camera circles the figure so the world stays put; otherwise the figure turns
+    const spin = on && !reduce();
+    v.autoRotate = !st.world && spin; v.autoRotateSpeed = 1.1;
+    v.controls.autoRotate = !!st.world && spin; v.controls.autoRotateSpeed = 1.6;
+  }
   savePrefs();
 }
 
@@ -156,6 +225,7 @@ async function show(i, dir = 0) {
   if (st.viewer) {
     try { await st.viewer.loadSkin(skin.data, { model: skin.model === "slim" ? "slim" : "default" }); } catch (e) { /* ignore */ }
     st.viewer.playerObject.rotation.y = 0;
+    if (st.world) st.world.skinChanged();
   }
   root.classList.remove("pr-leave");
   if (dir && !reduce()) {
@@ -180,6 +250,8 @@ function wake() {
 
 // ---------- public ----------
 export function presenting() { return st.on; }
+/** Read-only look at the presentation state, for automated tests. */
+export const presentDebug = () => st;
 
 export async function startPresentation(list, startIndex = 0, onExit) {
   if (!list.length) return;
@@ -215,12 +287,12 @@ export function stopPresentation() {
 }
 
 export function setupPresentation() {
-  // scene + animation buttons
-  $("prScenes").replaceChildren(...SCENES.map(s => {
+  // group switch (Classic | Minecraft), scene buttons of the current group, animations
+  $("prGroups").replaceChildren(...GROUPS.map(g => {
     const b = document.createElement("button");
-    b.className = "pr-pill"; b.dataset.scene = s.id; b.id = "scene-" + s.id;
-    b.innerHTML = `<i class="sw sw-${s.id}"></i><span data-i18n="scene_${s.id}"></span>`;
-    b.addEventListener("click", () => applyScene(s.id));
+    b.dataset.group = g; b.id = "group-" + g;
+    b.innerHTML = `<span data-i18n="group_${g}"></span>`;
+    b.addEventListener("click", () => { if (g !== st.group) toggleGroup(); });
     return b;
   }));
   $("prAnims").replaceChildren(...ANIMS.map(a => {
@@ -252,7 +324,8 @@ export function setupPresentation() {
     else if (e.key === "ArrowLeft") { e.preventDefault(); show(st.i - 1, -1); }
     else if (e.key === "Escape" && !document.fullscreenElement) stopPresentation();
     else if (e.key === " ") { e.preventDefault(); applyRotate(!st.rotate); }
-    else if (/^[1-5]$/.test(e.key)) applyScene(SCENES[Number(e.key) - 1].id);
+    else if (/^[1-4]$/.test(e.key)) applyScene(SCENES[st.group][Number(e.key) - 1].id);
+    else if (e.key.toLowerCase() === "g") toggleGroup();
     else if (e.key.toLowerCase() === "m") openHeader();
     wake();
   });
