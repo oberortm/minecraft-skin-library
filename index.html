@@ -4,15 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Skin Library</title>
-<meta name="app-version" content="9">
+<meta name="app-version" content="10">
 <meta name="description" content="Personal Minecraft skin library in your browser: collect skins, view them in 3D and draw your own. Everything stays local.">
-<link rel="icon" href="icon.svg?v=9" type="image/svg+xml">
+<link rel="icon" href="icon.svg?v=10" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="css/style.css?v=9">
-<link rel="stylesheet" href="css/looks.css?v=9">
-<link rel="stylesheet" href="css/present.css?v=9">
+<link rel="stylesheet" href="css/style.css?v=10">
+<link rel="stylesheet" href="css/looks.css?v=10">
+<link rel="stylesheet" href="css/present.css?v=10">
 <script>
   // apply the saved theme before first paint; Studio is the only look
   (function () {
@@ -43,6 +43,7 @@
   <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M4 20l1-4L16 5l3 3L8 19zM14 7l3 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
   <symbol id="i-eraser" viewBox="0 0 24 24"><path d="M9 20h11M4.5 15.5l9-9 6 6-7.5 7.5H8z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
   <symbol id="i-fill" viewBox="0 0 24 24"><path d="M5 11l7-7 7 7-7 7zM5 11h14M20 15s1.5 2 1.5 3a1.5 1.5 0 01-3 0c0-1 1.5-3 1.5-3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+  <symbol id="i-noise" viewBox="0 0 24 24"><path d="M4 20l1-4L13 8l3 3-8 8z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M15 3h2v2h-2zM19 5h2v2h-2zM17 8h2v2h-2zM20 10h2v2h-2zM18 1h2v2h-2z" fill="currentColor"/></symbol>
   <symbol id="i-picker" viewBox="0 0 24 24"><path d="M14 6l4 4M5 19l1-4 8.5-8.5a2.1 2.1 0 013 3L9 18z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
   <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5M4 9h10a6 6 0 010 12h-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-redo" viewBox="0 0 24 24"><path d="M15 14l5-5-5-5M20 9H10a6 6 0 000 12h3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
@@ -216,10 +217,12 @@
         <div class="toolset" id="eTools">
           <button class="tool" data-tool="pencil" id="tool-pencil" data-i18n-title="pencil" aria-pressed="true"><svg class="ic"><use href="#i-pencil"/></svg><kbd>B</kbd></button>
           <button class="tool" data-tool="eraser" id="tool-eraser" data-i18n-title="eraser" aria-pressed="false"><svg class="ic"><use href="#i-eraser"/></svg><kbd>E</kbd></button>
+          <button class="tool" data-tool="noise" id="tool-noise" data-i18n-title="noise" aria-pressed="false"><svg class="ic"><use href="#i-noise"/></svg><kbd>N</kbd></button>
           <button class="tool" data-tool="fill" id="tool-fill" data-i18n-title="fill" aria-pressed="false"><svg class="ic"><use href="#i-fill"/></svg><kbd>G</kbd></button>
           <button class="tool" data-tool="picker" id="tool-picker" data-i18n-title="picker" aria-pressed="false"><svg class="ic"><use href="#i-picker"/></svg><kbd>I</kbd></button>
           <button class="tool" data-tool="rotate" id="tool-rotate" data-i18n-title="rotateTool" aria-pressed="false"><svg class="ic"><use href="#i-rotate"/></svg><kbd>R</kbd></button>
         </div>
+        <label class="tool-opt" id="eNoiseOpt" hidden><span data-i18n="noiseStrength"></span><input type="range" id="eNoise" min="5" max="100" step="5" value="25"><output id="eNoiseOut">25 %</output></label>
         <label class="check-line"><input type="checkbox" id="eMirror"> <span data-i18n="mirror"></span></label>
         <h3 data-i18n="color"></h3>
         <div class="color-row">
@@ -260,25 +263,25 @@
 
 <!--
   Cache busting: every CSS/JS URL carries ?v=N. The import map below gives every module exactly one
-  versioned URL, so "./app.js" and "./app.js?v=9" never become two module instances.
+  versioned URL, so "./app.js" and "./app.js?v=10" never become two module instances.
   Raise the number everywhere in this file for each release (see README).
   Vendored libraries carry their version in the folder name instead (vendor/three@0.156.1/ ...).
 -->
 <script type="importmap">
 {
   "imports": {
-    "./js/app.js": "./js/app.js?v=9",
-    "./js/db.js": "./js/db.js?v=9",
-    "./js/dom.js": "./js/dom.js?v=9",
-    "./js/editor.js": "./js/editor.js?v=9",
-    "./js/fig3d.js": "./js/fig3d.js?v=9",
-    "./js/i18n.js": "./js/i18n.js?v=9",
-    "./js/motion.js": "./js/motion.js?v=9",
-    "./js/present.js": "./js/present.js?v=9",
-    "./js/skin.js": "./js/skin.js?v=9",
-    "./js/view3d.js": "./js/view3d.js?v=9",
-    "./js/paint3d.js": "./js/paint3d.js?v=9",
-    "./js/mcworld.js": "./js/mcworld.js?v=9",
+    "./js/app.js": "./js/app.js?v=10",
+    "./js/db.js": "./js/db.js?v=10",
+    "./js/dom.js": "./js/dom.js?v=10",
+    "./js/editor.js": "./js/editor.js?v=10",
+    "./js/fig3d.js": "./js/fig3d.js?v=10",
+    "./js/i18n.js": "./js/i18n.js?v=10",
+    "./js/motion.js": "./js/motion.js?v=10",
+    "./js/present.js": "./js/present.js?v=10",
+    "./js/skin.js": "./js/skin.js?v=10",
+    "./js/view3d.js": "./js/view3d.js?v=10",
+    "./js/paint3d.js": "./js/paint3d.js?v=10",
+    "./js/mcworld.js": "./js/mcworld.js?v=10",
     "skinview3d": "./vendor/skinview3d@3.0.1/skinview3d.js",
     "skinview-utils": "./vendor/skinview-utils@0.7.1/index.js",
     "three": "./vendor/three@0.156.1/three.module.min.js",
@@ -303,6 +306,6 @@
     }, 4000);
   });
 </script>
-<script type="module" src="js/app.js?v=9"></script>
+<script type="module" src="js/app.js?v=10"></script>
 </body>
 </html>

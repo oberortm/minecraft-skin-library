@@ -8,12 +8,14 @@ import { Paint3D } from "./paint3d.js";
 const S = 10; // texture canvas scale (64 px -> 640 px)
 const RECENT_KEY = "skin-library-recent-colors";
 const MODE_KEY = "skin-library-editor-mode";
+const NOISE_KEY = "skin-library-noise";
+const STROKE_TOOLS = new Set(["pencil", "eraser", "noise"]);
 
 const ed = {
   open: false, skin: null, onSave: null,
   tex: null, ctx: null,
   model: "classic", layer: "base", tool: "pencil", color: "#3b6fe0",
-  show: { base: true, outer: true }, mirror: false, mode: "3d", space: false,
+  show: { base: true, outer: true }, mirror: false, noise: 0.25, mode: "3d", space: false,
   undo: [], redo: [], dirty: false,
   stroke: null, hover: null, hover3d: null, p3d: null, p3dFailed: false, frame: 0,
 };
@@ -33,6 +35,11 @@ function setPx(x, y, rgba) {
   if (x < 0 || y < 0 || x > 63 || y > 63) return;
   if (rgba[3] === 0) ed.ctx.clearRect(x, y, 1, 1);
   else { ed.ctx.fillStyle = `rgba(${rgba[0]},${rgba[1]},${rgba[2]},${rgba[3] / 255})`; ed.ctx.clearRect(x, y, 1, 1); ed.ctx.fillRect(x, y, 1, 1); }
+}
+/** The colour, randomly lighter or darker; strength 0..1 (1 = up to half way to white/black). */
+function noisy(rgba) {
+  const d = (Math.random() * 2 - 1) * ed.noise * 0.5;
+  return rgba.map((c, i) => (i === 3 ? c : Math.round(d > 0 ? c + (255 - c) * d : c * (1 + d))));
 }
 function line(x0, y0, x1, y1, fn) {
   const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
@@ -104,6 +111,7 @@ function applyAt(x, y, first) {
   if (first) snapshot();
   const paint = (px, py) => {
     if (tool === "fill") flood(px, py, hexToRgba(ed.color));
+    else if (tool === "noise") setPx(px, py, noisy(hexToRgba(ed.color)));
     else setPx(px, py, tool === "eraser" ? [0, 0, 0, 0] : hexToRgba(ed.color));
   };
   paint(x, y);
@@ -202,7 +210,7 @@ function bindPaint(canvas, toTex) {
     if (!p) return;
     canvas.setPointerCapture(e.pointerId);
     const changed = applyAt(p[0], p[1], true);
-    ed.stroke = changed && (ed.tool === "pencil" || ed.tool === "eraser") ? { last: p, canvas } : null;
+    ed.stroke = changed && STROKE_TOOLS.has(ed.tool) ? { last: p, canvas } : null;
     if (changed) { ed.dirty = true; redraw(); }
   });
   canvas.addEventListener("pointermove", e => {
@@ -255,7 +263,7 @@ function bindPaint3d(canvas) {
     setHover3d(h);
     if (!h || h.blocked) return;
     const changed = applyAt(h.x, h.y, true);
-    ed.stroke = changed && (ed.tool === "pencil" || ed.tool === "eraser")
+    ed.stroke = changed && STROKE_TOOLS.has(ed.tool)
       ? { canvas, sx: e.clientX, sy: e.clientY, last: [h.x, h.y], t: performance.now(), id: e.pointerId } : null;
     if (changed) { ed.dirty = true; redraw(); }
   });
@@ -314,6 +322,7 @@ function setColor(hex) {
 }
 function setTool(tool) {
   ed.tool = tool;
+  $("eNoiseOpt").hidden = tool !== "noise";
   document.querySelectorAll("#eTools .tool").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.tool === tool)));
   syncRotate();
 }
@@ -478,6 +487,12 @@ export function setupEditor() {
   $("eShowBase").addEventListener("change", e => setShow("base", e.target.checked));
   $("eShowOuter").addEventListener("change", e => setShow("outer", e.target.checked));
   $("eMirror").addEventListener("change", e => { ed.mirror = e.target.checked; });
+  const setNoise = v => { ed.noise = v / 100; $("eNoise").value = v; $("eNoiseOut").textContent = v + " %"; };
+  try { const v = Number(localStorage.getItem(NOISE_KEY)); if (v >= 5 && v <= 100) setNoise(v); } catch (e) { /* ignore */ }
+  $("eNoise").addEventListener("input", e => {
+    setNoise(Number(e.target.value));
+    try { localStorage.setItem(NOISE_KEY, e.target.value); } catch (err) { /* ignore */ }
+  });
   ["eGrid", "eRegions"].forEach(id => $(id).addEventListener("change", () => drawTexCanvas()));
   $("eUndo").addEventListener("click", undo);
   $("eRedo").addEventListener("click", redoFn);
@@ -502,7 +517,7 @@ export function setupEditor() {
       return;
     }
     if (e.key.toLowerCase() === "m") { ed.mirror = !ed.mirror; $("eMirror").checked = ed.mirror; return; }
-    const map = { b: "pencil", e: "eraser", g: "fill", i: "picker", r: "rotate" };
+    const map = { b: "pencil", e: "eraser", n: "noise", g: "fill", i: "picker", r: "rotate" };
     if (map[e.key.toLowerCase()]) setTool(map[e.key.toLowerCase()]);
   });
   $("editor").addEventListener("keyup", e => { if (e.key === " " && ed.space) { e.preventDefault(); ed.space = false; syncRotate(); } });
