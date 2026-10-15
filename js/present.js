@@ -68,6 +68,7 @@ async function initViewer() {
       v.zoom = Math.min(0.66, 0.66 * (r.width / r.height) / 0.95);
     }).observe($("prStage"));
     st.viewer = v;
+    bindSkinDrag(v, kit.THREE);
   } catch (e) { console.error("[skin-library] presentation 3D failed:", e); st.viewer = null; }
   return st.viewer;
 }
@@ -205,6 +206,31 @@ function applyRotate(on) {
     v.controls.autoRotate = !!st.world && spin; v.controls.autoRotateSpeed = 1.6;
   }
   savePrefs();
+}
+
+// ---------- pointer: left drag / one finger turns the skin, right drag / two fingers move the camera ----------
+function bindSkinDrag(v, THREE) {
+  const c = v.controls;
+  c.mouseButtons = { LEFT: -1, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
+  c.touches = { ONE: -1, TWO: THREE.TOUCH.DOLLY_ROTATE };
+  const canvas = v.canvas, touches = new Set();
+  let drag = null;
+  canvas.addEventListener("contextmenu", e => e.preventDefault());
+  canvas.addEventListener("pointerdown", e => {
+    if (e.pointerType === "touch") touches.add(e.pointerId);
+    if (touches.size > 1) { drag = null; return; } // two fingers: the camera takes over
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    drag = { id: e.pointerId, x: e.clientX };
+    canvas.setPointerCapture(e.pointerId);
+  });
+  canvas.addEventListener("pointermove", e => {
+    if (!drag || drag.id !== e.pointerId) return;
+    v.playerWrapper.rotation.y += (e.clientX - drag.x) * 0.012;
+    drag.x = e.clientX;
+  });
+  const end = e => { touches.delete(e.pointerId); if (drag && drag.id === e.pointerId) drag = null; };
+  canvas.addEventListener("pointerup", end);
+  canvas.addEventListener("pointercancel", end);
 }
 
 // ---------- particles ----------
