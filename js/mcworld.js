@@ -241,11 +241,13 @@ const LOOKS = {
     bloom: [0.22, 0.45, 0.9], player: [0.25, 0.3],
   },
   "mc-dark": {
-    set: "roomDark", exposure: 1.15,
+    // a stage: one cone of light from above, the room only just visible around it
+    set: "roomDark", exposure: 1.0,
     sky: { top: "#030305", horizon: "#07060a", bottom: "#020203", sun: sunAt(0, 1.4), sunColor: "#000000", sunSize: 0.0001, glow: 0 },
-    fog: ["#050408", 160, 520], hemi: ["#3a3550", "#0a0910", 0.32],
-    key: null, spot: { color: "#fff0d6", intensity: 10, angle: 0.3, penumbra: 0.42 }, fill: 0,
-    bloom: [0.85, 0.55, 0.62], player: [0.3, 2.4],
+    fog: ["#050408", 160, 520], hemi: ["#2c2a36", "#0a0910", 0.22],
+    key: null, spot: { color: "#fff0d6", intensity: 5.2, angle: 0.3, penumbra: 0.5 }, fill: 0.55,
+    // high bloom threshold: bright hair lit from above must not glow
+    bloom: [0.35, 0.5, 0.97], player: [0.15, 1.2],
   },
   "mc-sunrise": {
     set: "land", exposure: 1.0,
@@ -328,6 +330,10 @@ export class McWorld {
     this.key.shadow.normalBias = 0.6;
     this.key.target.position.set(0, FEET, 0);
     this.root.add(this.hemi, this.key, this.key.target);
+    // soft light from the viewer's side so the figure's front is never lost in the dark
+    this.fillLight = new THREE.DirectionalLight("#ffffff", 0);
+    this.fillLight.position.set(0, 0.3, 1);
+    v.camera.add(this.fillLight);
     v.scene.onBeforeRender = () => this.tick();
   }
 
@@ -438,8 +444,6 @@ export class McWorld {
           const corner = Math.abs(x) === R && Math.abs(z) === R;
           const pillar = corner || (Math.abs(x) % 4 === 0 && Math.abs(z) === R) || (Math.abs(z) % 4 === 0 && Math.abs(x) === R);
           if (pillar) type = white ? "pillar" : "darkPolished";
-          if (!white && !pillar && y === 2 && (x + z) % 3 === 0) type = (x * 7 + z) % 2 ? "glowAmber" : "glowCyan";
-          if (!white && pillar && y === H - 1) type = "glowAmber";
           cells.push([type, x, y, z]);
         }
       }
@@ -455,14 +459,6 @@ export class McWorld {
       }
       // the ceiling does not cast shadows, so the soft key light from above still reaches the floor
       g.add(this.buildBlocks(ceiling, 13, { shadows: false }));
-    }
-    if (!white) {
-      // a few accent lights next to glowing blocks (no shadows, cheap)
-      for (const [x, z, c] of [[R - 1, 4, "#ffb347"], [-R + 1, -4, "#6ff0e0"], [4, -R + 1, "#ffb347"], [-4, R - 1, "#6ff0e0"]]) {
-        const l = new THREE.PointLight(c, 1.6, 260, 2);
-        l.position.set(x * B, FEET + B * 1.5, z * B);
-        g.add(l);
-      }
     }
     return g;
   }
@@ -648,6 +644,8 @@ export class McWorld {
       this.spot.angle = look.spot.angle; this.spot.penumbra = look.spot.penumbra; this.spot.distance = 0; this.spot.decay = 0;
     }
     // skinview3d's own lights: a little camera light keeps the figure readable from every side
+    this.fillLight.intensity = look.fill;
+    this.fillLight.color.set(look.fillColor || "#fff4e6");
     v.globalLight.intensity = look.player[0];
     v.cameraLight.intensity = look.player[1];
     this.applyBloom(look);
@@ -710,6 +708,7 @@ export class McWorld {
     const v = this.viewer, r = v.renderer, s = this.saved;
     v.scene.onBeforeRender = () => {};
     v.scene.remove(this.root);
+    v.camera.remove(this.fillLight);
     v.scene.fog = null;
     this.root.traverse(o => { if (o.isInstancedMesh) o.dispose(); if (o.shadow && o.shadow.map) o.shadow.dispose(); });
     for (const d of this.disposables) d.dispose();

@@ -4,15 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Skin Library</title>
-<meta name="app-version" content="19">
+<meta name="app-version" content="20">
 <meta name="description" content="Personal Minecraft skin library in your browser: collect skins, view them in 3D and draw your own. Everything stays local.">
-<link rel="icon" href="icon.svg?v=19" type="image/svg+xml">
+<link rel="icon" href="icon.svg?v=20" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="css/style.css?v=19">
-<link rel="stylesheet" href="css/looks.css?v=19">
-<link rel="stylesheet" href="css/present.css?v=19">
+<link rel="stylesheet" href="css/style.css?v=20">
+<link rel="stylesheet" href="css/looks.css?v=20">
+<link rel="stylesheet" href="css/present.css?v=20">
 <script>
   // apply the saved theme before first paint; Studio is the only look
   (function () {
@@ -284,25 +284,25 @@
 
 <!--
   Cache busting: every CSS/JS URL carries ?v=N. The import map below gives every module exactly one
-  versioned URL, so "./app.js" and "./app.js?v=19" never become two module instances.
+  versioned URL, so "./app.js" and "./app.js?v=20" never become two module instances.
   Raise the number everywhere in this file for each release (see README).
   Vendored libraries carry their version in the folder name instead (vendor/three@0.156.1/ ...).
 -->
 <script type="importmap">
 {
   "imports": {
-    "./js/app.js": "./js/app.js?v=19",
-    "./js/db.js": "./js/db.js?v=19",
-    "./js/dom.js": "./js/dom.js?v=19",
-    "./js/editor.js": "./js/editor.js?v=19",
-    "./js/fig3d.js": "./js/fig3d.js?v=19",
-    "./js/i18n.js": "./js/i18n.js?v=19",
-    "./js/motion.js": "./js/motion.js?v=19",
-    "./js/present.js": "./js/present.js?v=19",
-    "./js/skin.js": "./js/skin.js?v=19",
-    "./js/view3d.js": "./js/view3d.js?v=19",
-    "./js/paint3d.js": "./js/paint3d.js?v=19",
-    "./js/mcworld.js": "./js/mcworld.js?v=19",
+    "./js/app.js": "./js/app.js?v=20",
+    "./js/db.js": "./js/db.js?v=20",
+    "./js/dom.js": "./js/dom.js?v=20",
+    "./js/editor.js": "./js/editor.js?v=20",
+    "./js/fig3d.js": "./js/fig3d.js?v=20",
+    "./js/i18n.js": "./js/i18n.js?v=20",
+    "./js/motion.js": "./js/motion.js?v=20",
+    "./js/present.js": "./js/present.js?v=20",
+    "./js/skin.js": "./js/skin.js?v=20",
+    "./js/view3d.js": "./js/view3d.js?v=20",
+    "./js/paint3d.js": "./js/paint3d.js?v=20",
+    "./js/mcworld.js": "./js/mcworld.js?v=20",
     "skinview3d": "./vendor/skinview3d@3.0.1/skinview3d.js",
     "skinview-utils": "./vendor/skinview-utils@0.7.1/index.js",
     "three": "./vendor/three@0.156.1/three.module.min.js",
@@ -327,6 +327,6 @@
     }, 4000);
   });
 </script>
-<script type="module" src="js/app.js?v=19"></script>
+<script type="module" src="js/app.js?v=20"></script>
 </body>
 </html>
