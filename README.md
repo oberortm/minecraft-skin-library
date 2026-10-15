@@ -18,7 +18,7 @@ Persönliche Minecraft-Skin-Bibliothek im Browser: Skins per Drag & Drop sammeln
   - *Classic:* Studio (weiß), Spotlight (schwarz), Golden hour (Sonnenuntergang), Moonlight (Nacht) als Bühnen-Hintergründe.
   - *Minecraft:* dieselben vier Stimmungen als echte 3D-Blockwelt, in der der Skin steht: weißer Raum als nahtloses Fotostudio mit Lichtpaneelen in der Decke, derselbe Raum dunkel und nur vom Lichtkegel beleuchtet, Sonnenaufgang und Nacht in einer Hügellandschaft mit freier Lichtung, drei Bäumen und einem See, in dem sich Sonne bzw. Mond spiegeln (beide stehen beim Start schräg links hinter dem Skin); nachts nur Mond- und Sternenlicht. Die Kamera bleibt beim Herauszoomen und Drehen immer vor den Blöcken. Weiche Echtzeit-Schatten, ACES-Tonemapping, Nebel, Himmelsverlauf, Bloom, volumetrisches Licht (Lichtstrahlen von Sonne bzw. Mond, die von Figur und Bäumen unterbrochen werden) spiegelndes Wasser mit Wellen und weiche Umgebungsverschattung (Ecken und Kanten zwischen Blöcken werden sanft dunkler, wie „Smooth Lighting“). Standardmäßig sind alle Texturen selbst gezeichnet (im Code erzeugt, Vanilla-Stil); die Seite liefert keine Spielgrafiken mit. Im Zahnrad-Menü (nur Minecraft-Gruppe) wählst du unter „Texturen“: Eingebaut, Minecraft Standard, Faithful 32x, Bare Bones, Stay True oder eine eigene .zip. Erst bei Auswahl lädt dein Browser die Originale einmalig direkt von der offiziellen Quelle (Mojangs Spieldateien bzw. Modrinth, mit Ladebalken) und speichert nur die benötigten Bilder lokal; nichts davon ist Teil dieser Website. Klappt ein Download nicht, erscheint ein Link zur offiziellen Seite, dann kannst du das Pack dort laden und als eigene Datei wählen. Fehlende Blöcke nutzen die eingebauten Texturen. Qualität „Hoch“ (Bloom, Lichtstrahlen, spiegelndes Wasser, feinere Schatten) oder „Niedrig“: Ohne eigene Wahl entscheidet die Seite (Handys und schwache Geräte starten auf Niedrig, bei ruckelnder Darstellung wird heruntergeschaltet); im Zahnrad-Menü kannst du die Stufe selbst festlegen, sie wird gemerkt.
   
-  Animationen (Stehen, Gehen, Rennen, Fliegen), Drehen, Vollbild. Gruppe und Szene werden gemerkt. Das Menü versteckt sich und kommt über den Menü-Button oben links zurück; geschlossen wird es mit ✕, einem Klick in die Szene, Esc oder automatisch, sobald die Maus deutlich nach unten weggeht.
+  Animationen (Stehen, Gehen, Rennen, Fliegen), Drehen, Vollbild. Über den Knopf „Ausrüstung“ legst du der Figur eine Elytra an; „Fliegen“ zieht sie automatisch an, wie im Spiel. Die Ausrüstung gilt für alle Skins und wird gemerkt. Gruppe und Szene werden gemerkt. Das Menü versteckt sich und kommt über den Menü-Button oben links zurück; geschlossen wird es mit ✕, einem Klick in die Szene, Esc oder automatisch, sobald die Maus deutlich nach unten weggeht.
 - **Oberfläche:** Ein klarer Look mit 3D-Figuren in den Karten, Hell/Dunkel und Englisch/Deutsch per Knopfdruck im Header.
 
 ### Tastenkürzel im Editor
@@ -100,7 +100,8 @@ js/skin.js          Skin-Geometrie, Rendering, Formatumwandlung
 js/fig3d.js         3D-Figuren aus CSS-Boxen für die Karten (ohne WebGL)
 js/motion.js        Einblenden beim Scrollen, Titel-Animation
 js/present.js       Präsentationsmodus
-js/pack.js          Resourcepack lesen (ZIP) und lokal speichern
+js/pack.js          Textur-Quellen: Download (Mojang/Modrinth), ZIP lesen, lokal speichern
+js/equipment.js     Ausrüstung der Figur (Elytra, Rüstung, Items) und eigene Texturen dafür
 js/mcworld.js       Minecraft-Szenen: Blockwelt, Licht, Schatten, Nebel, Bloom (nur bei Bedarf geladen)
 js/db.js            Speicher (IndexedDB)
 js/dom.js           Fehlertolerante DOM-Helfer für den Start
