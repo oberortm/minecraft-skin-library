@@ -50,6 +50,9 @@ Auf dem Handy malt ein Finger, zwei Finger drehen und zoomen.
 | `1`–`4` | Szene der aktuellen Gruppe wählen |
 | `G` | Gruppe wechseln (Classic / Minecraft) |
 | `M` | Menü einblenden (`Esc` schließt es wieder) |
+| Linke Maustaste ziehen / 1 Finger | Skin drehen |
+| Rechte Maustaste ziehen / 2 Finger | Kamera drehen (2 Finger: auch zoomen) |
+| Mausrad | Zoomen |
 | `H` | Bedienelemente aus-/einblenden (auch per Knopf; Maus bewegen holt sie zurück) |
 | `Esc` | Präsentation beenden |
 
