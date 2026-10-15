@@ -203,6 +203,45 @@ const BLOCKS = {
 };
 const SEETHROUGH = new Set(["leaves"]);
 
+/**
+ * Soft block ambient occlusion, like smooth lighting in the game: every block instance knows which of
+ * its 26 neighbours are filled (two 13-bit masks); faces darken softly towards edges that touch one.
+ */
+const AO_GLSL = `
+varying vec2 vAoMask; varying vec3 vAoPos; varying vec3 vAoN;
+float aoBit(float idx) {
+  float v = idx < 13.5 ? vAoMask.x : vAoMask.y;
+  float i = idx < 13.5 ? idx : idx - 14.0;
+  return mod(floor(v / exp2(i)), 2.0);
+}
+float aoOcc(vec3 o) { return aoBit((o.x + 1.0) * 9.0 + (o.y + 1.0) * 3.0 + (o.z + 1.0)); }
+float aoEdge(float t) { return smoothstep(0.02, 0.5, t); }
+float blockAO() {
+  vec3 n = normalize(vAoN), an = abs(n);
+  vec3 U, V; float a, b;
+  if (an.x > 0.5) { U = vec3(0.0, 1.0, 0.0); V = vec3(0.0, 0.0, 1.0); a = vAoPos.y; b = vAoPos.z; }
+  else if (an.y > 0.5) { U = vec3(1.0, 0.0, 0.0); V = vec3(0.0, 0.0, 1.0); a = vAoPos.x; b = vAoPos.z; }
+  else { U = vec3(1.0, 0.0, 0.0); V = vec3(0.0, 1.0, 0.0); a = vAoPos.x; b = vAoPos.y; }
+  vec3 N = sign(n) * step(0.5, an);
+  float s1 = aoOcc(N + U), s2 = aoOcc(N - U), s3 = aoOcc(N + V), s4 = aoOcc(N - V);
+  float ea = aoEdge(a), eA = aoEdge(-a), eb = aoEdge(b), eB = aoEdge(-b);
+  float o = s1 * ea + s2 * eA + s3 * eb + s4 * eB;
+  o += aoOcc(N + U + V) * ea * eb * (1.0 - s1) * (1.0 - s3) + aoOcc(N + U - V) * ea * eB * (1.0 - s1) * (1.0 - s4)
+     + aoOcc(N - U + V) * eA * eb * (1.0 - s2) * (1.0 - s3) + aoOcc(N - U - V) * eA * eB * (1.0 - s2) * (1.0 - s4);
+  return 1.0 - 0.42 * min(o, 1.4);
+}`;
+function addBlockAO(m) {
+  m.onBeforeCompile = sh => {
+    sh.vertexShader = sh.vertexShader
+      .replace("#include <common>", "#include <common>\nattribute vec2 aoMask; varying vec2 vAoMask; varying vec3 vAoPos; varying vec3 vAoN;")
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvAoMask = aoMask; vAoPos = position / 16.0; vAoN = normal;");
+    sh.fragmentShader = sh.fragmentShader
+      .replace("#include <common>", "#include <common>\n" + AO_GLSL)
+      .replace("#include <aomap_fragment>", "#include <aomap_fragment>\n{ float bao = blockAO(); reflectedLight.indirectDiffuse *= bao; reflectedLight.directDiffuse *= mix(1.0, bao, 0.5); }");
+  };
+  m.customProgramCacheKey = () => "block-ao";
+}
+
 /** Sky dome: gradient, square sun or moon, stars. Outputs linear HDR; the output pass tone-maps it. */
 function skyMaterial() {
   return new THREE.ShaderMaterial({
@@ -496,6 +535,7 @@ export class McWorld {
       const m = new THREE.MeshStandardMaterial({ map: this.texture(texName), roughness: 0.92, metalness: 0 });
       if (def.cutout) { m.alphaTest = 0.5; m.side = THREE.DoubleSide; }
       if (def.glow) { m.emissive = new THREE.Color(def.glow[0]); m.emissiveMap = m.map; m.emissiveIntensity = def.glow[1]; }
+      addBlockAO(m);
       this.materials.set(key, m);
     }
     return this.materials.get(key);
@@ -515,12 +555,24 @@ export class McWorld {
       if (!byType.has(type)) byType.set(type, []);
       byType.get(type).push(c);
     }
-    const geo = new THREE.BoxGeometry(B, B, B);
-    this.disposables.push(geo);
+    const box = new THREE.BoxGeometry(B, B, B);
+    this.disposables.push(box);
+    const all = new Set(cells.map(([, x, y, z]) => x + "," + y + "," + z));
     const m4 = new THREE.Matrix4(), col = new THREE.Color(), r = rng(seed);
     for (const [type, list] of byType) {
       const f = BLOCKS[type].faces;
       const mats = (Array.isArray(f) ? f : Array(6).fill(f)).map(n => this.material(n, type));
+      // neighbour masks for the ambient occlusion shader
+      const geo = box.clone(), ao = new Float32Array(list.length * 2);
+      list.forEach(([, x, y, z], i) => {
+        for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (let dz = -1; dz <= 1; dz++) {
+          const idx = (dx + 1) * 9 + (dy + 1) * 3 + (dz + 1);
+          if (idx === 13 || !all.has((x + dx) + "," + (y + dy) + "," + (z + dz))) continue;
+          if (idx < 13) ao[i * 2] += 2 ** idx; else ao[i * 2 + 1] += 2 ** (idx - 14);
+        }
+      });
+      geo.setAttribute("aoMask", new THREE.InstancedBufferAttribute(ao, 2));
+      this.disposables.push(geo);
       const mesh = new THREE.InstancedMesh(geo, mats, list.length);
       list.forEach(([, x, y, z], i) => {
         m4.makeTranslation(x * B, FEET - B / 2 + y * B, z * B);
