@@ -2,7 +2,8 @@
 const STRINGS = {
   de: {
     appName: "Skin Library",
-    tagline: "Deine persönliche Minecraft-Skin-Bibliothek. Alles bleibt lokal in deinem Browser.",
+    tagline: "Deine persönliche Minecraft-Skin-Bibliothek",
+    openSource: "open source",
     import: "Skins importieren",
     newSkin: "Neuer Skin",
     more: "Mehr",
@@ -16,11 +17,11 @@ const STRINGS = {
     settings: "Einstellungen",
     look: "Look",
     lookMc: "Minecraft",
-    lookMcDesc: "Menü-Knöpfe, Inventar-Slots und Blöcke",
-    lookAlbum: "Sammelalbum",
-    lookAlbumDesc: "Skins als Sammelkarten auf Album-Seiten",
-    lookWorkshop: "Pixel-Werkstatt",
-    lookWorkshopDesc: "Karopapier, Kugelschreiber und Marker",
+    lookMcDesc: "Modernes Spielmenü vor einer Pixel-Landschaft",
+    lookPrism: "Prism",
+    lookPrismDesc: "Alles in Bewegung: 3D-Figuren, Lichtschleier, Fly-ins",
+    lookStudio: "Studio",
+    lookStudioDesc: "Klar und ruhig, Figuren drehen sich mit der Maus",
     lookGallery: "Ausstellung",
     lookGalleryDesc: "Ruhig und groß, Figuren auf Sockeln",
     lookStandard: "Standard",
@@ -113,6 +114,7 @@ const STRINGS = {
     // toasts
     imported: "{n} Skin(s) importiert",
     skippedDup: "{name}: ist schon in der Bibliothek",
+    skippedDups: "{n} Skins sind schon in der Bibliothek und wurden übersprungen",
     badSize: "{name}: {w}×{h} wird nicht unterstützt (nur 64×64 oder 64×32)",
     notImage: "{name}: keine gültige PNG-Datei",
     saved: "Gespeichert",
@@ -130,7 +132,8 @@ const STRINGS = {
   },
   en: {
     appName: "Skin Library",
-    tagline: "Your personal Minecraft skin library. Everything stays in your browser.",
+    tagline: "Your personal Minecraft skin library",
+    openSource: "open source",
     import: "Import skins",
     newSkin: "New skin",
     more: "More",
@@ -144,11 +147,11 @@ const STRINGS = {
     settings: "Settings",
     look: "Look",
     lookMc: "Minecraft",
-    lookMcDesc: "Menu buttons, inventory slots and blocks",
-    lookAlbum: "Collector's album",
-    lookAlbumDesc: "Skins as trading cards on album pages",
-    lookWorkshop: "Pixel workshop",
-    lookWorkshopDesc: "Graph paper, ballpoint pen and marker",
+    lookMcDesc: "Modern game menu in front of a pixel landscape",
+    lookPrism: "Prism",
+    lookPrismDesc: "Everything moves: 3D figures, light veils, fly-ins",
+    lookStudio: "Studio",
+    lookStudioDesc: "Calm and clean, figures turn with your cursor",
     lookGallery: "Exhibition",
     lookGalleryDesc: "Calm and large, figures on plinths",
     lookStandard: "Standard",
@@ -238,6 +241,7 @@ const STRINGS = {
     copySuffix: "copy",
     imported: "Imported {n} skin(s)",
     skippedDup: "{name}: already in the library",
+    skippedDups: "{n} skins were already in the library and were skipped",
     badSize: "{name}: {w}×{h} is not supported (only 64×64 or 64×32)",
     notImage: "{name}: not a valid PNG file",
     saved: "Saved",
@@ -258,7 +262,7 @@ const STRINGS = {
 const KEY = "skin-library-lang";
 let lang = (() => {
   try { const s = localStorage.getItem(KEY); if (s && STRINGS[s]) return s; } catch (e) { /* ignore */ }
-  return (navigator.language || "en").toLowerCase().startsWith("de") ? "de" : "en";
+  return "en";
 })();
 
 export const getLang = () => lang;

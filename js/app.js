@@ -2,7 +2,9 @@ import { t, applyI18n, setLang, getLang } from "./i18n.js";
 import { db, newId, askPersist } from "./db.js";
 import { renderFigure, detectModel, loadImage, REGIONS } from "./skin.js";
 import { openEditor, editorOpen } from "./editor.js";
-import { applyLook, savedLook } from "./looks.js";
+import { applyLook, savedLook, currentLook, LOOKS_3D, LOOKS_MOTION } from "./looks.js";
+import { buildFigure } from "./fig3d.js";
+import { reveal, bindTilt, trackScroll, splitTitle } from "./motion.js";
 
 const $ = id => document.getElementById(id);
 const state = { skins: [], view: "front", filter: "all", sort: "new", search: "", current: null };
@@ -14,6 +16,7 @@ export function toast(msg, err = false) {
   el.className = "toast" + (err ? " err" : "");
   el.textContent = msg;
   $("toasts").appendChild(el);
+  while ($("toasts").children.length > 3) $("toasts").firstElementChild.remove();
   setTimeout(() => el.remove(), err ? 6000 : 3200);
 }
 
@@ -85,39 +88,33 @@ function renderGrid() {
   $("toolbar").hidden = n === 0;
   $("noMatch").hidden = !(n > 0 && list.length === 0);
   $("countLabel").textContent = n === 0 ? "" : list.length === n ? (n === 1 ? t("countOne") : t("countMany", { n })) : t("countFiltered", { shown: list.length, n });
+  const look = currentLook();
+  const is3d = LOOKS_3D.includes(look) && state.view !== "tex";
   const cards = list.map(skin => {
     const b = document.createElement("button");
     b.className = "card";
     b.id = "card-" + skin.id;
     b.dataset.model = skin.model;
     b.setAttribute("aria-label", t("open") + ": " + skin.name);
-    b.innerHTML = `<div class="stage${state.view === "tex" ? " tex" : ""}"><canvas></canvas></div>
+    b.innerHTML = `<div class="stage${state.view === "tex" ? " tex" : ""}${is3d ? " is3d" : ""}">${is3d ? "" : "<canvas></canvas>"}</div>
       <div class="card-name"></div>
       <div class="card-meta"><span class="badge model">${skin.model === "slim" ? t("slim") : t("classic")}</span>${skin.fmt === "64x32" ? `<span class="badge">${t("badgeLegacy")}</span>` : ""}</div>
       <div class="card-date">${t("added")} ${new Date(skin.created).toLocaleDateString(getLang())}</div>
       ${skin.fav ? '<svg class="star" aria-hidden="true"><use href="#i-star"/></svg>' : ""}`;
     b.querySelector(".card-name").textContent = skin.name;
-    drawThumb(b.querySelector("canvas"), skin);
+    if (is3d) {
+      const stage = b.querySelector(".stage");
+      stage.dataset.side = state.view;
+      buildFigure(skin).then(fig => stage.appendChild(fig));
+      bindTilt(b);
+    } else {
+      drawThumb(b.querySelector("canvas"), skin);
+    }
     b.addEventListener("click", () => openDetail(skin.id));
     return b;
   });
-  const album = document.documentElement.dataset.look === "album";
-  grid.classList.toggle("paged", album);
-  if (!album) { grid.replaceChildren(...cards); return; }
-  const pages = [];
-  for (let i = 0; i < cards.length; i += 9) {
-    const page = document.createElement("section");
-    page.className = "page";
-    const inner = document.createElement("div");
-    inner.className = "page-grid";
-    inner.append(...cards.slice(i, i + 9));
-    const no = document.createElement("div");
-    no.className = "page-no";
-    no.textContent = t("page", { n: i / 9 + 1 });
-    page.append(inner, no);
-    pages.push(page);
-  }
-  grid.replaceChildren(...pages);
+  grid.replaceChildren(...cards);
+  if (LOOKS_MOTION.includes(look)) reveal(cards);
 }
 
 // ---------- import ----------
@@ -133,6 +130,7 @@ function readAsDataURL(file) {
 async function importFiles(files) {
   const added = [];
   const known = new Set(state.skins.map(s => s.data));
+  const dups = [];
   let order = Date.now();
   for (const file of files) {
     const name = file.name.replace(/\.png$/i, "");
@@ -143,11 +141,13 @@ async function importFiles(files) {
       img = await loadImage(data);
     } catch (e) { toast(t("notImage", { name: file.name }), true); continue; }
     if (!(img.width === 64 && (img.height === 64 || img.height === 32))) { toast(t("badSize", { name: file.name, w: img.width, h: img.height }), true); continue; }
-    if (known.has(data)) { toast(t("skippedDup", { name: file.name })); continue; }
+    if (known.has(data)) { dups.push(file.name); continue; }
     known.add(data);
     const now = order++;
     added.push({ id: newId(), name, data, model: detectModel(img), fmt: img.height === 32 ? "64x32" : "64x64", fav: false, notes: "", created: now, updated: now });
   }
+  if (dups.length === 1) toast(t("skippedDup", { name: dups[0] }));
+  else if (dups.length > 1) toast(t("skippedDups", { n: dups.length }));
   if (!added.length) return;
   try { await db.putMany(added); } catch (e) { toast(t("storageError"), true); return; }
   askPersist();
@@ -405,6 +405,8 @@ function syncLooks() {
 
 async function boot() {
   applyLook(savedLook());
+  splitTitle(document.querySelector(".top h1"));
+  trackScroll();
   loadUi();
   applyI18n();
   seg("viewSeg", state.view, v => { state.view = v; saveUi(); renderGrid(); });

@@ -55,10 +55,18 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 /* header */
 .top { display: flex; flex-wrap: wrap; gap: 14px 20px; align-items: center; justify-content: space-between; }
-.brand { display: flex; gap: 12px; align-items: center; min-width: 0; }
-.brand img { image-rendering: pixelated; border-radius: 6px; flex: none; }
+.top { padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+.brand { display: flex; gap: 14px; align-items: center; min-width: 0; }
+.mark { width: 40px; height: 40px; flex: none; }
+.mark .mk-top { fill: color-mix(in srgb, var(--accent) 55%, #ffffff); }
+.mark .mk-left { fill: var(--accent); }
+.mark .mk-right { fill: color-mix(in srgb, var(--accent) 60%, #000000); }
+.brand-text { min-width: 0; }
 h1 { font: 700 clamp(26px, 4vw, 34px)/1.05 var(--f-display); margin: 0; letter-spacing: .5px; }
-.tagline { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
+h1 .ch { display: inline-block; }
+.tagline { margin: 4px 0 0; color: var(--muted); font-size: 14px; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.oss { font: 500 12px var(--f-mono); color: var(--accent); text-decoration: none; letter-spacing: .02em; }
+.oss:hover { text-decoration: underline; text-underline-offset: 3px; }
 .top-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 
 /* buttons */
@@ -100,7 +108,8 @@ h1 { font: 700 clamp(26px, 4vw, 34px)/1.05 var(--f-display); margin: 0; letter-s
 .tool-group { display: inline-flex; align-items: center; gap: 8px; }
 .search input { width: min(240px, 100%); padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
 .search { flex: 0 1 240px; min-width: 0; }
-select { padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+select { padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background-color: var(--surface); color: var(--fg); }
+select option, select optgroup { background-color: var(--surface); color: var(--fg); }
 .count { margin-left: auto; color: var(--muted); font: 500 13px var(--f-mono); font-variant-numeric: tabular-nums; }
 
 /* grid */
@@ -236,11 +245,20 @@ h3 { margin: 0; font: 500 11px var(--f-mono); text-transform: uppercase; letter-
 .look-sw { grid-row: span 2; display: flex; width: 54px; height: 34px; border-radius: 6px; overflow: hidden; border: 1px solid var(--line); }
 .look-sw i { flex: 1; }
 .look-sw.mc i:nth-child(1) { background: #5d9a32; } .look-sw.mc i:nth-child(2) { background: #7a5236; } .look-sw.mc i:nth-child(3) { background: #c6c6c6; }
-.look-sw.album i:nth-child(1) { background: #e8762c; } .look-sw.album i:nth-child(2) { background: #1f9e8f; } .look-sw.album i:nth-child(3) { background: #fbfcff; }
-.look-sw.workshop i:nth-child(1) { background: #1d2a6b; } .look-sw.workshop i:nth-child(2) { background: #ffd93b; } .look-sw.workshop i:nth-child(3) { background: #fbfbf7; }
+.look-sw.prism i:nth-child(1) { background: #7c3aed; } .look-sw.prism i:nth-child(2) { background: #06b6d4; } .look-sw.prism i:nth-child(3) { background: #ec4899; }
+.look-sw.studio i:nth-child(1) { background: #f4f4f1; } .look-sw.studio i:nth-child(2) { background: #c9cfd6; } .look-sw.studio i:nth-child(3) { background: #111214; }
 .look-sw.gallery i:nth-child(1) { background: #ecedea; } .look-sw.gallery i:nth-child(2) { background: #7a1f2b; } .look-sw.gallery i:nth-child(3) { background: #1e1e1c; }
 .look-sw.standard i:nth-child(1) { background: #2c5bd0; } .look-sw.standard i:nth-child(2) { background: #eef1f6; } .look-sw.standard i:nth-child(3) { background: #182032; }
 
 /* parts only some looks show */
 .card-date { display: none; font-size: 12px; color: var(--muted); }
 .page-no { display: none; }
+
+/* CSS 3D figure (used by the 3D looks) */
+.stage.is3d { perspective: 900px; overflow: visible; }
+.f3 { --base-ry: -28deg; --rx: -8deg; position: relative; width: 1px; height: 1px; transform-style: preserve-3d;
+  transform: scale(var(--f3-scale, .62)) rotateX(var(--rx)) rotateY(calc(var(--base-ry) + var(--turn, 0deg))); }
+.stage[data-side="back"] .f3 { --base-ry: 152deg; }
+.f3-rig, .f3-box { position: absolute; left: 0; top: 0; transform-style: preserve-3d; }
+.f3-box i { position: absolute; left: 0; top: 0; background-image: var(--skin); background-size: calc(var(--u) * 64) calc(var(--u) * 64);
+  background-repeat: no-repeat; image-rendering: pixelated; backface-visibility: hidden; }

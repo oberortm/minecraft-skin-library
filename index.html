@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="de">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -13,10 +13,10 @@
 <script>
   // apply the saved look and theme before first paint
   (function () {
-    var d = document.documentElement, look = "mc";
+    var d = document.documentElement, look = "standard", ok = ["standard", "mc", "gallery", "prism", "studio"];
     try {
       var th = localStorage.getItem("skin-library-theme"); if (th === "light" || th === "dark") d.dataset.theme = th;
-      var l = localStorage.getItem("skin-library-look"); if (l) look = l;
+      var l = localStorage.getItem("skin-library-look"); if (ok.indexOf(l) > -1) look = l;
     } catch (e) {}
     d.dataset.look = look;
   })();
@@ -45,10 +45,14 @@
 <div class="app">
   <header class="top">
     <div class="brand">
-      <img src="favicon.svg" alt="" width="34" height="34">
-      <div>
-        <h1 data-i18n="appName">Skin Library</h1>
-        <p class="tagline" data-i18n="tagline"></p>
+      <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
+        <path class="mk-top" d="M16 2 29 9.5 16 17 3 9.5z"/>
+        <path class="mk-left" d="M3 9.5 16 17v14L3 23.5z"/>
+        <path class="mk-right" d="M29 9.5 16 17v14l13-7.5z"/>
+      </svg>
+      <div class="brand-text">
+        <h1>Skin Library</h1>
+        <p class="tagline"><span data-i18n="tagline"></span> <a class="oss" href="https://github.com/oberortm/minecraft-skin-library" target="_blank" rel="noopener">[<span data-i18n="openSource"></span>]</a></p>
       </div>
     </div>
     <div class="top-actions">
@@ -105,11 +109,11 @@
     <section class="set-block">
       <h3 data-i18n="look"></h3>
       <div class="looks" id="lookList" role="radiogroup">
-        <button class="look-opt" role="radio" data-look="mc" id="look-mc"><span class="look-sw mc"><i></i><i></i><i></i></span><b data-i18n="lookMc"></b><small data-i18n="lookMcDesc"></small></button>
-        <button class="look-opt" role="radio" data-look="album" id="look-album"><span class="look-sw album"><i></i><i></i><i></i></span><b data-i18n="lookAlbum"></b><small data-i18n="lookAlbumDesc"></small></button>
-        <button class="look-opt" role="radio" data-look="workshop" id="look-workshop"><span class="look-sw workshop"><i></i><i></i><i></i></span><b data-i18n="lookWorkshop"></b><small data-i18n="lookWorkshopDesc"></small></button>
-        <button class="look-opt" role="radio" data-look="gallery" id="look-gallery"><span class="look-sw gallery"><i></i><i></i><i></i></span><b data-i18n="lookGallery"></b><small data-i18n="lookGalleryDesc"></small></button>
         <button class="look-opt" role="radio" data-look="standard" id="look-standard"><span class="look-sw standard"><i></i><i></i><i></i></span><b data-i18n="lookStandard"></b><small data-i18n="lookStandardDesc"></small></button>
+        <button class="look-opt" role="radio" data-look="studio" id="look-studio"><span class="look-sw studio"><i></i><i></i><i></i></span><b data-i18n="lookStudio"></b><small data-i18n="lookStudioDesc"></small></button>
+        <button class="look-opt" role="radio" data-look="prism" id="look-prism"><span class="look-sw prism"><i></i><i></i><i></i></span><b data-i18n="lookPrism"></b><small data-i18n="lookPrismDesc"></small></button>
+        <button class="look-opt" role="radio" data-look="mc" id="look-mc"><span class="look-sw mc"><i></i><i></i><i></i></span><b data-i18n="lookMc"></b><small data-i18n="lookMcDesc"></small></button>
+        <button class="look-opt" role="radio" data-look="gallery" id="look-gallery"><span class="look-sw gallery"><i></i><i></i><i></i></span><b data-i18n="lookGallery"></b><small data-i18n="lookGalleryDesc"></small></button>
       </div>
     </section>
     <section class="set-block">
