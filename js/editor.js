@@ -15,7 +15,7 @@ const ed = {
   open: false, skin: null, onSave: null,
   tex: null, ctx: null,
   model: "classic", layer: "base", tool: "pencil", color: "#3b6fe0",
-  show: { base: true, outer: true }, parts: { head: true, body: true, rightArm: true, leftArm: true, rightLeg: true, leftLeg: true }, mirror: false, noise: 0.25, color2: "#0f2a5c", mode: "3d", space: false,
+  alpha: 1, show: { base: true, outer: true }, parts: { head: true, body: true, rightArm: true, leftArm: true, rightLeg: true, leftLeg: true }, mirror: false, noise: 0.25, color2: "#0f2a5c", mode: "3d", space: false,
   undo: [], redo: [], dirty: false,
   stroke: null, hover: null, hover3d: null, p3d: null, p3dFailed: false, frame: 0,
 };
@@ -26,15 +26,19 @@ export const editorDebug = () => ed;
 
 // ---------- drawing primitives ----------
 const aw = () => (ed.model === "slim" ? 3 : 4);
+/** The colour as RGBA with the chosen opacity. */
 function hexToRgba(hex) {
   const n = parseInt(hex.slice(1), 16);
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255, 255];
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255, Math.round(ed.alpha * 255)];
 }
 function getPx(x, y) { return ed.ctx.getImageData(x, y, 1, 1).data; }
+const onePx = () => ed.onePx || (ed.onePx = ed.ctx.createImageData(1, 1));
 function setPx(x, y, rgba) {
   if (x < 0 || y < 0 || x > 63 || y > 63) return;
-  if (rgba[3] === 0) ed.ctx.clearRect(x, y, 1, 1);
-  else { ed.ctx.fillStyle = `rgba(${rgba[0]},${rgba[1]},${rgba[2]},${rgba[3] / 255})`; ed.ctx.clearRect(x, y, 1, 1); ed.ctx.fillRect(x, y, 1, 1); }
+  // write the exact value (fillStyle with alpha would round through premultiplied colour)
+  const px = onePx();
+  px.data[0] = rgba[0]; px.data[1] = rgba[1]; px.data[2] = rgba[2]; px.data[3] = rgba[3];
+  ed.ctx.putImageData(px, x, y);
 }
 /** The colour, randomly lighter or darker; strength 0..1 (1 = up to half way to white/black). */
 function noisy(rgba) {
@@ -115,7 +119,7 @@ function updateGradient(x, y) {
   const put = (px, py, t) => {
     const i = (py * 64 + px) * 4;
     for (let k = 0; k < 3; k++) d[i + k] = Math.round(c1[k] + (c2[k] - c1[k]) * t);
-    d[i + 3] = 255;
+    d[i + 3] = c1[3];
   };
   for (const [px, py] of g.pixels) {
     const t = len2 ? Math.min(1, Math.max(0, ((px - ax) * dx + (py - ay) * dy) / len2)) : 0;
@@ -156,7 +160,7 @@ function applyAt(x, y, first) {
   if (tool === "rotate") return false;
   if (tool === "picker") {
     const p = getPx(x, y);
-    if (p[3] > 0) setColor("#" + [p[0], p[1], p[2]].map(v => v.toString(16).padStart(2, "0")).join(""));
+    if (p[3] > 0) { setColor("#" + [p[0], p[1], p[2]].map(v => v.toString(16).padStart(2, "0")).join("")); setAlpha(Math.round(p[3] / 255 * 100)); }
     setTool("pencil");
     return false;
   }
@@ -398,6 +402,12 @@ function setColor(hex) {
   $("eColor").value = ed.color;
   $("eHex").value = ed.color;
 }
+function setAlpha(v) {
+  v = Math.max(0, Math.min(100, Math.round(v)));
+  ed.alpha = v / 100;
+  $("eAlpha").value = v; $("eAlphaOut").textContent = v + " %";
+  $("eAlphaHint").hidden = v === 100;
+}
 function setTool(tool) {
   ed.tool = tool;
   $("eNoiseOpt").hidden = tool !== "noise";
@@ -500,6 +510,7 @@ export async function openEditor(skin, onSave) {
   ed.skin = skin; ed.onSave = onSave;
   ed.tex = document.createElement("canvas"); ed.tex.width = 64; ed.tex.height = 64;
   ed.ctx = ed.tex.getContext("2d", { willReadFrequently: true });
+  ed.onePx = null;
   ed.ctx.imageSmoothingEnabled = false;
   ed.undo = []; ed.redo = []; ed.dirty = false; ed.hover = null; ed.hover3d = null; ed.stroke = null;
   ed.model = skin ? skin.model : "classic";
@@ -578,6 +589,7 @@ export function setupEditor() {
   $("eShowBase").addEventListener("click", () => setShow("base", !ed.show.base));
   $("eShowOuter").addEventListener("click", () => setShow("outer", !ed.show.outer));
   $("eMirror").addEventListener("change", e => { ed.mirror = e.target.checked; });
+  $("eAlpha").addEventListener("input", e => setAlpha(Number(e.target.value)));
   const setColor2 = hex => { ed.color2 = hex.toLowerCase(); $("eColor2").value = ed.color2; $("eHex2").value = ed.color2; };
   $("eColor2").addEventListener("input", e => setColor2(e.target.value));
   $("eHex2").addEventListener("change", e => {
