@@ -211,9 +211,9 @@ const DISPLAY = {
   shield: { r: [0, 90, 0], t: [10, 6, -4], s: 1 },
 };
 for (const k of ["sword", "axe", "pickaxe", "mace"]) DISPLAY[k] = DISPLAY.handheld;
-// spear and trident are long weapons: a bit bigger than other items, tip raised forwards, held in the lower third of the shaft
+// spear and trident: about the size of a sword, tip raised forwards, held a little below the middle of the shaft
 // (fix: shift in the arm's space so that point of the shaft sits in the fist)
-DISPLAY.spear = DISPLAY.trident = { r: [0, -90, 35], t: [0, 4, 0.5], s: 1.15, fix: [0, 3, -1.6] };
+DISPLAY.spear = DISPLAY.trident = { r: [0, -90, 30], t: [0, 4, 0.5], s: 0.9, fix: [0, 1.9, -4.6] };
 for (const k of ["totem", "torch", "map"]) DISPLAY[k] = DISPLAY.generated;
 
 /**
@@ -355,7 +355,7 @@ export function applyItems(viewer, THREE, hands, pack) {
       // the sprite as the game builds it: x 0..16, y 0..16 with the top of the picture up, 1 px thick around z = 8
       mesh.position.set(0, 16, 8);
       // the big spear and trident keep the thickness of a normal item
-      if (h.item === "spear" || h.item === "trident") mesh.scale.z = 0.85 / 1.15;
+      if (h.item === "spear" || h.item === "trident") mesh.scale.z = 0.85 / 0.9;
       holder.add(mesh); meshes.push(mesh);
     }
     if (h.glint) {
