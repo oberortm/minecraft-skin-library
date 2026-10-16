@@ -319,12 +319,15 @@
         <div class="pfp-row"><span class="seg-label" data-i18n="pfpCrop"></span>
           <span class="seg" id="pfpCrop"><button data-v="head" data-i18n="pfpHead"></button><button data-v="bust" data-i18n="pfpBust"></button><button data-v="full" data-i18n="pfpFull"></button></span></div>
         <div class="pfp-row"><span class="seg-label" data-i18n="pfpStyle"></span>
-          <span class="seg" id="pfpStyle"><button data-v="flat" data-i18n="pfpFlat"></button><button data-v="front" data-i18n="pfp3dFront"></button><button data-v="angle" data-i18n="pfp3dAngle"></button></span></div>
+          <span class="seg" id="pfpStyle"><button data-v="flat" data-i18n="pfpFlat"></button><button data-v="front" data-i18n="pfp3dFront"></button><button data-v="angle" data-i18n="pfp3dAngle"></button><button data-v="voxel" data-i18n="pfpVoxel"></button><button data-v="chibi" data-i18n="pfpChibi"></button></span></div>
         <div class="pfp-row"><span class="seg-label" data-i18n="pfpBg"></span>
-          <span class="seg" id="pfpBg"><button data-v="none" data-i18n="pfpBgNone"></button><button data-v="color" data-i18n="pfpBgColor"></button><button data-v="gradient" data-i18n="pfpBgGradient"></button></span>
+          <span class="seg" id="pfpBg"><button data-v="none" data-i18n="pfpBgNone"></button><button data-v="color" data-i18n="pfpBgColor"></button><button data-v="gradient" data-i18n="pfpBgGradient"></button><button data-v="scene" data-i18n="pfpBgScene"></button></span>
+          <select id="pfpScene"><option value="sky" data-i18n="pfpSceneSky"></option><option value="sunset" data-i18n="pfpSceneSunset"></option><option value="night" data-i18n="pfpSceneNight"></option><option value="nether">Nether</option><option value="end">End</option></select>
           <input type="color" id="pfpC1" data-i18n-title="pfpColor1"><input type="color" id="pfpC2" data-i18n-title="pfpColor2"></div>
         <div class="pfp-row"><span class="seg-label" data-i18n="pfpShape"></span>
           <span class="seg" id="pfpShape"><button data-v="square" data-i18n="pfpSquare"></button><button data-v="rounded" data-i18n="pfpRounded"></button><button data-v="round" data-i18n="pfpRound"></button></span></div>
+        <div class="pfp-row"><label class="check-line"><input type="checkbox" id="pfpRing"> <span data-i18n="pfpRing"></span></label><input type="color" id="pfpRingColor" data-i18n-title="pfpRingColor"></div>
+        <div class="pfp-row"><label class="check-line"><input type="checkbox" id="pfpText"> <span data-i18n="pfpText"></span></label><input type="text" id="pfpTextValue" maxlength="14" autocomplete="off" spellcheck="false" data-i18n-title="pfpText"></div>
         <label class="pfp-row"><span class="seg-label" data-i18n="pfpSize"></span>
           <select id="pfpSize"><option value="128">128 px</option><option value="256">256 px</option><option value="512">512 px</option><option value="1024">1024 px</option></select></label>
         <button class="btn primary" id="pfpSave"><svg class="ic"><use href="#i-upload"/></svg><span data-i18n="pfpSave"></span></button>
@@ -458,6 +461,7 @@
     "./js/emotes.js": "./js/emotes.js?v=51",
     "./js/cinema.js": "./js/cinema.js?v=51",
     "./js/saver.js": "./js/saver.js?v=51",
+    "./js/voxel.js": "./js/voxel.js?v=51",
     "./js/mcworld.js": "./js/mcworld.js?v=51",
     "skinview3d": "./vendor/skinview3d@3.0.1/skinview3d.js",
     "skinview-utils": "./vendor/skinview-utils@0.7.1/index.js",
@@ -502,6 +506,7 @@
 <link rel="modulepreload" href="js/emotes.js?v=51">
 <link rel="modulepreload" href="js/cinema.js?v=51">
 <link rel="modulepreload" href="js/saver.js?v=51">
+<link rel="modulepreload" href="js/voxel.js?v=51">
 <link rel="modulepreload" href="js/pack.js?v=51">
 <script type="module" src="js/app.js?v=51"></script>
 </body>

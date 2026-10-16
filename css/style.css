@@ -362,3 +362,7 @@ h3 { margin: 0; font: 500 11px var(--f-mono); text-transform: uppercase; letter-
 .sv-preview img, .sv-preview video { max-width: 100%; max-height: min(56vh, 520px); display: block; }
 #svSave .ic { transform: rotate(180deg); }
 #svSave { text-decoration: none; }
+
+.pfp-row .seg { flex-wrap: wrap; }
+.pfp-row select[hidden], .pfp-row input[hidden] { display: none; }
+#pfpTextValue { min-width: 0; width: 150px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: inherit; font: inherit; }

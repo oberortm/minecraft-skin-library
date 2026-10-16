@@ -5,10 +5,12 @@ import { $ } from "./dom.js";
 import { load3d } from "./view3d.js";
 import { loadImage, renderFigure, legacyTo64 } from "./skin.js";
 import { saveWithPreview, canvasBlob } from "./saver.js";
+import { buildVoxelFigure, renderVoxel } from "./voxel.js";
 
 const KEY = "skin-library-pfp";
 const st = { skin: null, img: null, viewer: null, kit: null, seq: 0, opts: null };
-const DEFAULTS = { crop: "head", style: "angle", bg: "gradient", c1: "#7aa2ff", c2: "#c86bff", shape: "round", size: "512" };
+const DEFAULTS = { crop: "head", style: "angle", bg: "gradient", c1: "#7aa2ff", c2: "#c86bff", shape: "round", size: "512",
+  scene: "sunset", ring: false, ringColor: "#ffb02a", text: false, textValue: "" };
 
 function loadOpts() {
   try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(KEY) || "{}") }; } catch (e) { return { ...DEFAULTS }; }
@@ -89,6 +91,50 @@ function roundRect(ctx, x, y, w, h, r) {
 }
 
 /** Draw the picture with the current options into a new canvas of the chosen size. */
+/** Pixel-art backdrops drawn in code: sky, sunset, night, Nether, End. */
+function drawScene(ctx, S, scene) {
+  const px = S / 32, rnd = (() => { let s = 7; return () => { s = (s * 16807) % 2147483647; return s / 2147483647; }; })();
+  const grad = stops => { const g = ctx.createLinearGradient(0, 0, 0, S); stops.forEach(([o, c]) => g.addColorStop(o, c)); ctx.fillStyle = g; ctx.fillRect(0, 0, S, S); };
+  const blocks = (y0, cols) => { for (let x = 0; x < 32; x++) { const top = y0 + Math.round(Math.sin(x * 0.55) * 1.2 + Math.sin(x * 0.21) * 1.5); for (let y = top; y < 32; y++) { ctx.fillStyle = cols[y === top ? 0 : y < top + 2 ? 1 : 2]; ctx.fillRect(x * px, y * px, px + 0.5, px + 0.5); } } };
+  if (scene === "sky") {
+    grad([[0, "#5d9bff"], [0.7, "#a9d3ff"], [1, "#d8ecff"]]);
+    ctx.fillStyle = "rgba(255,255,255,.92)";
+    for (const [x, y, w] of [[3, 5, 7], [19, 3, 9], [12, 9, 6], [25, 10, 5]]) { ctx.fillRect(x * px, y * px, w * px, 2 * px); ctx.fillRect((x + 1) * px, (y - 1) * px, (w - 2) * px, px); }
+    blocks(25, ["#5fa83a", "#6b4a32", "#5c3f2a"]);
+  } else if (scene === "sunset") {
+    grad([[0, "#2c1d4f"], [0.45, "#b6466a"], [0.72, "#ff9a4d"], [1, "#ffcf7a"]]);
+    ctx.fillStyle = "#ffe08a"; ctx.fillRect(20 * px, 16 * px, 6 * px, 6 * px);
+    blocks(24, ["#3f5f2a", "#3d2a1d", "#2c1e14"]);
+  } else if (scene === "night") {
+    grad([[0, "#02060f"], [0.6, "#0a1b3d"], [1, "#16305e"]]);
+    ctx.fillStyle = "#fff";
+    for (let i = 0; i < 60; i++) { const s = rnd() < 0.2 ? px * 0.6 : px * 0.35; ctx.globalAlpha = 0.4 + rnd() * 0.6; ctx.fillRect(rnd() * S, rnd() * S * 0.7, s, s); }
+    ctx.globalAlpha = 1; ctx.fillStyle = "#e9efff"; ctx.fillRect(5 * px, 4 * px, 5 * px, 5 * px);
+    ctx.fillStyle = "#c9d4f0"; ctx.fillRect(6 * px, 5 * px, px, px); ctx.fillRect(8 * px, 7 * px, px, px);
+    blocks(25, ["#234022", "#1e1712", "#140f0c"]);
+  } else if (scene === "nether") {
+    grad([[0, "#2a0505"], [0.6, "#6b1a10"], [1, "#c23a12"]]);
+    for (let i = 0; i < 40; i++) { ctx.fillStyle = `rgba(255,${120 + rnd() * 100 | 0},40,${0.3 + rnd() * 0.5})`; ctx.fillRect(rnd() * S, rnd() * S, px * 0.4, px * 0.4); }
+    blocks(24, ["#7a2a26", "#5e1d1b", "#ff7a1a"]);
+  } else {
+    grad([[0, "#0c0614"], [0.7, "#2a1240"], [1, "#3d1c58"]]);
+    for (let i = 0; i < 70; i++) { ctx.fillStyle = `rgba(230,200,255,${0.3 + rnd() * 0.7})`; ctx.fillRect(rnd() * S, rnd() * S * 0.75, px * 0.35, px * 0.35); }
+    blocks(25, ["#e8e6a8", "#d4d090", "#bdb877"]);
+  }
+}
+/** The name (or own text) big and faint behind the figure, slanted. */
+function drawBackText(ctx, S, text, light) {
+  if (!text) return;
+  const size = S * 0.34;
+  ctx.save();
+  ctx.translate(S / 2, S / 2); ctx.rotate(-0.22);
+  ctx.font = `800 ${size}px "Bricolage Grotesque", system-ui, sans-serif`;
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillStyle = light ? "rgba(255,255,255,.2)" : "rgba(0,0,0,.12)";
+  for (const dy of [-1, 0, 1]) ctx.fillText(text.toUpperCase(), dy * size * 0.25, dy * size * 0.95);
+  ctx.restore();
+}
+
 async function compose() {
   const o = st.opts, S = Number(o.size) || 512;
   const out = document.createElement("canvas"); out.width = out.height = S;
@@ -97,6 +143,7 @@ async function compose() {
   if (o.shape === "round") { ctx.beginPath(); ctx.arc(S / 2, S / 2, S / 2, 0, Math.PI * 2); ctx.clip(); }
   else if (o.shape === "rounded") { roundRect(ctx, 0, 0, S, S, S * 0.18); ctx.clip(); }
   if (o.bg === "color") { ctx.fillStyle = o.c1; ctx.fillRect(0, 0, S, S); }
+  else if (o.bg === "scene") drawScene(ctx, S, o.scene);
   else if (o.bg === "gradient") {
     const g = ctx.createLinearGradient(0, 0, S, S); g.addColorStop(0, o.c1); g.addColorStop(1, o.c2);
     ctx.fillStyle = g; ctx.fillRect(0, 0, S, S);
@@ -105,7 +152,23 @@ async function compose() {
     r.addColorStop(0, "rgba(255,255,255,.35)"); r.addColorStop(1, "rgba(255,255,255,0)");
     ctx.fillStyle = r; ctx.fillRect(0, 0, S, S);
   }
-  if (o.style === "flat") {
+  if (o.text) drawBackText(ctx, S, (o.textValue || st.skin.name || "").slice(0, 14), o.bg !== "none");
+  if (o.style === "voxel" || o.style === "chibi") {
+    const kit = st.kit || (st.kit = await load3d());
+    if (!kit) throw new Error("3d");
+    const key = st.skin.id + st.skin.updated + o.style;
+    if (st.voxKey !== key) {
+      if (st.vox) st.vox.userData.dispose();
+      const tex = document.createElement("canvas"); tex.width = tex.height = 64;
+      tex.getContext("2d").drawImage(st.skin.fmt === "64x32" ? legacyTo64(st.img) : st.img, 0, 0);
+      st.vox = buildVoxelFigure(kit.THREE, tex, st.skin.model === "slim", o.style === "chibi");
+      st.voxKey = key;
+    }
+    const inner = Math.round(S * (o.shape === "round" ? 0.86 : 1));
+    const c3 = renderVoxel(kit.THREE, st.vox, inner, o.crop, true);
+    const y = o.crop === "bust" ? S - inner : (S - inner) / 2;
+    ctx.drawImage(c3, (S - inner) / 2, y + (o.crop === "bust" ? inner * 0.04 : 0));
+  } else if (o.style === "flat") {
     const src = flatSource(o.crop), pad = o.shape === "round" ? 0.2 : 0.12;
     const avail = S * (1 - pad * 2), k = Math.floor(avail / Math.max(src.width, src.height)) || avail / Math.max(src.width, src.height);
     const w = src.width * k, h = src.height * k;
@@ -120,6 +183,22 @@ async function compose() {
     ctx.drawImage(c3, (S - inner) / 2, y + (o.crop === "bust" ? inner * 0.04 : 0));
   }
   ctx.restore();
+  // a coloured ring along the edge
+  if (o.ring) {
+    const w = S * 0.04;
+    ctx.save(); ctx.lineWidth = w; ctx.strokeStyle = o.ringColor;
+    ctx.beginPath();
+    if (o.shape === "round") ctx.arc(S / 2, S / 2, S / 2 - w / 2, 0, Math.PI * 2);
+    else if (o.shape === "rounded") roundRect(ctx, w / 2, w / 2, S - w, S - w, S * 0.18 - w / 2);
+    else ctx.rect(w / 2, w / 2, S - w, S - w);
+    ctx.stroke();
+    ctx.lineWidth = Math.max(1, S * 0.006); ctx.strokeStyle = "rgba(0,0,0,.25)";
+    ctx.beginPath();
+    if (o.shape === "round") ctx.arc(S / 2, S / 2, S / 2 - w, 0, Math.PI * 2);
+    else if (o.shape === "rounded") roundRect(ctx, w, w, S - 2 * w, S - 2 * w, S * 0.18 - w);
+    else ctx.rect(w, w, S - 2 * w, S - 2 * w);
+    ctx.stroke(); ctx.restore();
+  }
   return out;
 }
 
@@ -145,7 +224,11 @@ function sync() {
     $(id).querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === o[key])));
   }
   $("pfpC1").value = o.c1; $("pfpC2").value = o.c2; $("pfpSize").value = o.size;
-  $("pfpC1").hidden = o.bg === "none"; $("pfpC2").hidden = o.bg !== "gradient";
+  $("pfpC1").hidden = o.bg !== "color" && o.bg !== "gradient"; $("pfpC2").hidden = o.bg !== "gradient";
+  $("pfpScene").hidden = o.bg !== "scene"; $("pfpScene").value = o.scene;
+  $("pfpRing").checked = o.ring; $("pfpRingColor").value = o.ringColor; $("pfpRingColor").hidden = !o.ring;
+  $("pfpText").checked = o.text; $("pfpTextValue").hidden = !o.text; $("pfpTextValue").value = o.textValue;
+  $("pfpTextValue").placeholder = st.skin ? st.skin.name : "";
 }
 
 export async function openPfp(skin) {
@@ -170,7 +253,9 @@ export function setupPfp() {
       st.opts[key] = b.dataset.v; saveOpts(); sync(); refresh();
     });
   }
-  for (const [id, key] of [["pfpC1", "c1"], ["pfpC2", "c2"], ["pfpSize", "size"]]) {
+  $("pfpRing").addEventListener("change", e => { st.opts.ring = e.target.checked; saveOpts(); sync(); refresh(); });
+  $("pfpText").addEventListener("change", e => { st.opts.text = e.target.checked; saveOpts(); sync(); refresh(); });
+  for (const [id, key] of [["pfpC1", "c1"], ["pfpC2", "c2"], ["pfpSize", "size"], ["pfpScene", "scene"], ["pfpRingColor", "ringColor"], ["pfpTextValue", "textValue"]]) {
     $(id).addEventListener("input", e => { st.opts[key] = e.target.value; saveOpts(); sync(); refresh(); });
   }
   $("pfpClose").addEventListener("click", closePfp);
