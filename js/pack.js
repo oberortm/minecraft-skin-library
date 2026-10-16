@@ -8,7 +8,7 @@ import { itemFiles } from "./equipment.js";
 
 const DB_NAME = "skin-library-pack";
 /** Raised when the list of textures we take from a pack grows: older stored packs get downloaded again. */
-const PACK_FORMAT = 2;
+const PACK_FORMAT = 3;
 export const packStale = pack => !pack || (pack.format || 1) < PACK_FORMAT;
 const STORE = "pack";
 
@@ -29,6 +29,25 @@ const FILES = {
   dark: [["block/blackstone", "block/deepslate", "blocks/stone_andesite"]],
   darkBrick: [["block/polished_blackstone_bricks", "block/deepslate_bricks", "blocks/stonebrick"]],
   darkPolished: [["block/polished_blackstone", "block/polished_deepslate", "blocks/stone_andesite_smooth"]],
+  // the Nether, the End, the ocean floor and the snowy mountains
+  netherrack: [["block/netherrack", "blocks/netherrack"]],
+  glowstone: [["block/glowstone", "blocks/glowstone"]],
+  lava: [["block/lava_still", "blocks/lava_still"]],
+  soulSand: [["block/soul_sand", "blocks/soul_sand"]],
+  endStone: [["block/end_stone", "blocks/end_stone"]],
+  obsidian: [["block/obsidian", "blocks/obsidian"]],
+  gravel: [["block/gravel", "blocks/gravel"]],
+  seagrass: [["block/seagrass"]],
+  kelp: [["block/kelp_plant"]],
+  coralPink: [["block/brain_coral_block"]],
+  coralBlue: [["block/tube_coral_block"]],
+  coralYellow: [["block/horn_coral_block"]],
+  prismarine: [["block/prismarine", "blocks/prismarine_rough"]],
+  snow: [["block/snow", "blocks/snow"]],
+  snowSide: [["block/grass_block_snow", "blocks/grass_side_snowed"]],
+  spruceLog: [["block/spruce_log", "blocks/log_spruce"]],
+  spruceLeaves: [["block/spruce_leaves", "blocks/leaves_spruce"], "#619961"],
+  ice: [["block/ice", "blocks/ice"]],
   // equipment for the presentation figure
   elytra: [["entity/equipment/wings/elytra", "entity/elytra"]],
   glint_entity: [["misc/enchanted_glint_armor", "misc/enchanted_glint_entity", "misc/enchanted_item_glint"]],

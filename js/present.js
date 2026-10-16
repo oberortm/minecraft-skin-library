@@ -23,7 +23,7 @@ export const SCENES = {
     { id: "sunset", amb: ["#fff0e2", 0.95], cam: ["#ffd7b0", 1.15], fx: "embers" },
     { id: "night", amb: ["#eaf0ff", 0.9], cam: ["#dde7ff", 1.1], fx: "stars" },
   ],
-  minecraft: [{ id: "mc-white" }, { id: "mc-dark" }, { id: "mc-sunrise" }, { id: "mc-night" }],
+  minecraft: [{ id: "mc-white" }, { id: "mc-dark" }, { id: "mc-sunrise" }, { id: "mc-night" }, { id: "mc-nether" }, { id: "mc-end" }, { id: "mc-ocean" }, { id: "mc-snow" }],
 };
 const GROUPS = Object.keys(SCENES);
 const groupOf = id => GROUPS.find(g => SCENES[g].some(s => s.id === id)) || "classic";
@@ -1133,7 +1133,7 @@ export function setupPresentation() {
     else if (e.key === "Escape" && document.body.classList.contains("hdr-open")) closeHeader();
     else if (e.key === "Escape" && !document.fullscreenElement) stopPresentation();
     else if (e.key === " ") { e.preventDefault(); applyRotate(!st.rotate); }
-    else if (/^[1-4]$/.test(e.key)) applyScene(SCENES[st.group][Number(e.key) - 1].id);
+    else if (/^[1-8]$/.test(e.key) && SCENES[st.group][Number(e.key) - 1]) applyScene(SCENES[st.group][Number(e.key) - 1].id);
     else if (e.key.toLowerCase() === "g") toggleGroup();
     else if (e.key.toLowerCase() === "m") openHeader();
     else if (e.key.toLowerCase() === "h") { st.uiHidden ? showUi() : hideUi(); return; }

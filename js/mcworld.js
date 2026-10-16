@@ -54,7 +54,7 @@ const B = 16;      // block size in skin pixels: a player is two blocks tall, as
 const FEET = -16;  // y of the player's soles in skinview3d model space (measured: the model spans -16..16)
 const reduce = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-export const MC_SCENES = ["mc-white", "mc-dark", "mc-sunrise", "mc-night"];
+export const MC_SCENES = ["mc-white", "mc-dark", "mc-sunrise", "mc-night", "mc-nether", "mc-end", "mc-ocean", "mc-snow"];
 
 /** Weak device? Phones and small or low-core machines get smaller shadows and no bloom. */
 export function guessQuality() {
@@ -243,6 +243,76 @@ const TEX = {
     if (x === 15 || y === 15) f *= 0.75;
     return shade(hex("#3a3541"), f);
   }),
+  // ---------- Nether, End, ocean floor, snow ----------
+  netherrack: s => paint(s, (x, y, r, n) => {
+    const v = n(x, y, 3, 2) * 0.55 + r() * 0.35 + ((x * 3 + y * 5) % 7 === 0 ? 0.25 : 0);
+    return pick(pal(["#4a1414", "#5e1a1a", "#6f2020", "#82292a", "#94343a"]), v);
+  }),
+  glowstone: s => paint(s, (x, y, r, n) => {
+    const cell = (Math.floor(x / 4) + Math.floor(y / 4) * 3) % 5, edge = x % 4 === 0 || y % 4 === 0;
+    return shade(hex(cell < 2 ? "#ffd27a" : "#f2a83c"), edge ? 0.62 : 0.85 + r() * 0.25 + n(x, y, 2, 2) * 0.2);
+  }),
+  lava: s => paint(s, (x, y, r, n) => {
+    const v = n(x, y, 4, 4) * 0.7 + n(x, y, 2, 2, 5) * 0.3;
+    return v > 0.62 ? hex("#ffd05a") : v > 0.42 ? hex("#ff8a1e") : shade(hex("#d8480e"), 0.85 + r() * 0.2);
+  }),
+  soulSand: s => paint(s, (x, y, r, n) => {
+    const face = (x % 8 > 1 && x % 8 < 5) && (y % 8 === 3 || y % 8 === 5);
+    return face ? hex("#2e2018") : pick(pal(["#4a3628", "#55402f", "#614a37", "#6d5440"]), n(x, y, 3, 3) * 0.6 + r() * 0.4);
+  }),
+  endStone: s => paint(s, (x, y, r, n) => {
+    const v = n(x, y, 3, 3) * 0.6 + r() * 0.4, pit = n(x, y, 2, 2, 9) > 0.78;
+    return pit ? hex("#bdb877") : pick(pal(["#d4d090", "#dcd99c", "#e3e0a8", "#ebe8b5"]), v);
+  }),
+  obsidian: s => paint(s, (x, y, r, n) => {
+    const v = n(x, y, 3, 3) * 0.6 + r() * 0.4;
+    if (v > 0.86) return hex("#4b2d6e");
+    return pick(pal(["#0e0a16", "#140f20", "#1b142a", "#241b38"]), v);
+  }),
+  crystal: s => paint(s, (x, y, r) => {
+    const d = Math.max(Math.abs(x - 7.5), Math.abs(y - 7.5));
+    return shade(hex(d < 3 ? "#ffe2ff" : d < 5.5 ? "#f08cff" : "#b04fd6"), 0.9 + r() * 0.15);
+  }),
+  gravel: s => paint(s, (x, y, r, n) => {
+    const stone = n(x, y, 2, 2) + r() * 0.35;
+    return pick(pal(["#5c5654", "#726b68", "#88807c", "#9e9792", "#b3aca7"]), stone * 0.75);
+  }),
+  seagrass: s => paint(s, (x, y, r, n) => {
+    const blade = [2, 5, 8, 11, 13].some((bx, k) => Math.abs(x - bx - Math.sin((y + k * 3) * 0.5) * 1.2) < 0.8 && y > 2 + (k % 3) * 2);
+    return blade ? pick(pal(["#2f6b2a", "#3b8233", "#4c9a3e"]), r()) : [0, 0, 0, 0];
+  }),
+  kelp: s => paint(s, (x, y, r) => {
+    const stem = Math.abs(x - 7.5 - Math.sin(y * 0.6) * 1.5) < 1.2;
+    const leaf = (y % 5 === 1 && x > 3 && x < 12) || (y % 5 === 2 && x > 5 && x < 10);
+    return stem || leaf ? pick(pal(["#3d6b1e", "#4f8227", "#5f9631"]), r()) : [0, 0, 0, 0];
+  }),
+  coralPink: s => paint(s, (x, y, r, n) => pick(pal(["#b73a6e", "#d04f87", "#e46aa0", "#f087b5"]), n(x, y, 2, 2) * 0.6 + r() * 0.4)),
+  coralBlue: s => paint(s, (x, y, r, n) => pick(pal(["#2b4fb3", "#3a63cc", "#4c7ae0", "#6a95f0"]), n(x, y, 2, 2) * 0.6 + r() * 0.4)),
+  coralYellow: s => paint(s, (x, y, r, n) => pick(pal(["#c9a52a", "#dcbb36", "#ead04a", "#f5e06a"]), n(x, y, 2, 2) * 0.6 + r() * 0.4)),
+  prismarine: s => paint(s, (x, y, r, n) => {
+    const v = n(x, y, 4, 4) * 0.6 + r() * 0.4, line = (x + y) % 6 === 0;
+    return line ? hex("#3f7f74") : pick(pal(["#4f9c8c", "#5fae9c", "#6fbfab", "#80cdb9"]), v);
+  }),
+  snow: s => paint(s, (x, y, r, n) => pick(pal(["#e4ecf2", "#eef3f7", "#f6f9fb", "#ffffff"]), n(x, y, 3, 3) * 0.5 + r() * 0.5)),
+  snowSide: s => { const peb = pebbles(s, 8); return paint(s, (x, y, r, n) => {
+    const drip = 3 + Math.floor(n(x, 0, 1.4, 16, 3) * 2.4);
+    if (y < drip) return pick(pal(["#e4ecf2", "#eef3f7", "#ffffff"]), r());
+    if (y === drip) return hex("#c9d3dc");
+    return dirtAt(x, y, r, n, peb);
+  }); },
+  spruceLog: s => paint(s, (x, y, r, n) => {
+    if ((x === 2 || x === 7 || x === 12) && n(x, y, 1, 3, 2) > 0.3) return hex("#2a1c0e");
+    return pick(pal(["#3a2814", "#46311a", "#523a20", "#5d4426"]), n(x, 0, 1.2, 16, 5) * 0.6 + r() * 0.4);
+  }),
+  spruceLeaves: s => paint(s, (x, y, r, n) => {
+    if (r() < 0.08) return [0, 0, 0, 0];
+    const top = y % 3 === 0 ? 0.3 : y % 3 === 2 ? -0.25 : 0;
+    return pick(pal(["#1f3a26", "#284a30", "#31593a", "#3c6845"]), n(x, y, 2, 2) * 0.4 + r() * 0.3 + 0.2 + top);
+  }),
+  ice: s => paint(s, (x, y, r, n) => {
+    const crack = Math.abs(n(x, y, 4, 4) - 0.5) < 0.035;
+    return crack ? hex("#e9f6ff") : shade(hex("#8fc3f2"), 0.92 + r() * 0.1 + n(x, y, 4, 4) * 0.1);
+  }),
   // studio walls: almost plain, a faint large-tile pattern so the surface still reads
   studioWhite: s => paint(s, (x, y, r) => {
     const joint = x === 0 || y === 0;
@@ -281,8 +351,26 @@ const BLOCKS = {
   glowAmber: { faces: "glowAmber", glow: ["#ffb347", 2.4] },
   panel: { faces: ["quartz", "quartz", "quartz", "panel", "quartz", "quartz"], glow: ["#fff6e6", 1.5] },
   glowCyan: { faces: "glowCyan", glow: ["#6ff0e0", 2.2] },
+  netherrack: { faces: "netherrack" },
+  glowstone: { faces: "glowstone", glow: ["#ffcf7a", 1.8] },
+  soulSand: { faces: "soulSand" },
+  endStone: { faces: "endStone" },
+  obsidian: { faces: "obsidian" },
+  crystal: { faces: "crystal", glow: ["#ff9cf5", 2.6] },
+  gravel: { faces: "gravel" },
+  seagrass: { faces: "seagrass", cutout: true },
+  kelp: { faces: "kelp", cutout: true },
+  coralPink: { faces: "coralPink" },
+  coralBlue: { faces: "coralBlue" },
+  coralYellow: { faces: "coralYellow" },
+  prismarine: { faces: "prismarine" },
+  snowGrass: { faces: ["snowSide", "snowSide", "snow", "dirt", "snowSide", "snowSide"] },
+  snow: { faces: "snow" },
+  spruceLog: { faces: ["spruceLog", "spruceLog", "logTop", "logTop", "spruceLog", "spruceLog"] },
+  spruceLeaves: { faces: "spruceLeaves", cutout: true },
+  ice: { faces: "ice" },
 };
-const SEETHROUGH = new Set(["leaves"]);
+const SEETHROUGH = new Set(["leaves", "seagrass", "kelp", "spruceLeaves"]);
 
 /**
  * Soft block ambient occlusion, like smooth lighting in the game: every block instance knows which of
@@ -459,7 +547,37 @@ const LOOKS = {
     // the moon stands where the sun rises: diagonally left behind the figure, mirrored in the lake
     key: { dir: sunAt(LIGHT_AZ, 0.32), color: "#b4c8ff", intensity: 1.15 }, fill: 0.4, fillColor: "#c8d6ff",
     bloom: [0.5, 0.6, 0.8], player: [0.15, 0.35], rays: { color: "#9fb6ff", strength: 0.2 }, water: ["#0c1c36", 0.3, 0.45], face: LIGHT_AZ,
+  },  "mc-nether": {
+    set: "nether", exposure: 1.0,
+    sky: { top: "#1a0404", horizon: "#5a1408", bottom: "#2a0604", sun: sunAt(LIGHT_AZ, 0.3), sunColor: "#000000", sunSize: 0.0001, glow: 0 },
+    fog: ["#5a1a10", 70, 340], hemi: ["#ff9a6a", "#3a0a06", 0.9],
+    // the lava lake is the light
+    key: { dir: sunAt(LIGHT_AZ, 0.25), color: "#ff8a3a", intensity: 1.8 }, fill: 0.45, fillColor: "#ffd0b0",
+    bloom: [0.55, 0.6, 0.8], player: [0.25, 0.5], face: LIGHT_AZ, forceWeather: "ash",
   },
+  "mc-end": {
+    set: "end", exposure: 1.05,
+    sky: { top: "#06030c", horizon: "#1c0f2e", bottom: "#030106", sun: sunAt(LIGHT_AZ, 0.6), sunColor: "#000000", sunSize: 0.0001, glow: 0, stars: 1.6 },
+    fog: ["#120a1e", 140, 620], hemi: ["#b9a6ff", "#140c22", 0.75],
+    key: { dir: sunAt(LIGHT_AZ + 0.5, 0.9), color: "#d9ccff", intensity: 1.3 }, fill: 0.45, fillColor: "#e4dcff",
+    bloom: [0.6, 0.6, 0.75], player: [0.2, 0.45], face: LIGHT_AZ, forceWeather: "clear",
+  },
+  "mc-ocean": {
+    set: "ocean", exposure: 1.0,
+    // under water: deep blue all round, light from far above, bubbles rising
+    sky: { top: "#0a3a6a", horizon: "#1a6aa0", bottom: "#06223f", sun: sunAt(0.4, 1.25), sunColor: "#9fe0ff", sunSize: 0.0001, glow: 0.4 },
+    fog: ["#0f4f7f", 40, 240], hemi: ["#7fd4ff", "#0d2f4f", 1.0],
+    key: { dir: sunAt(0.4, 1.25), color: "#a8e4ff", intensity: 1.6 }, fill: 0.4, fillColor: "#cfefff",
+    bloom: [0.3, 0.5, 0.9], player: [0.25, 0.5], face: LIGHT_AZ, forceWeather: "bubbles",
+  },
+  "mc-snow": {
+    set: "snow", exposure: 1.0,
+    sky: { top: "#6f9ad0", horizon: "#e8eef6", bottom: "#b9c6d6", sun: sunAt(LIGHT_AZ, 0.22), sunColor: "#fff2dc", sunSize: 0.03, glow: 0.6 },
+    fog: ["#dfe8f2", 170, 680], hemi: ["#dbe9ff", "#7d8899", 1.0],
+    key: { dir: sunAt(LIGHT_AZ, 0.35), color: "#fff0dc", intensity: 2.0 }, fill: 0.35,
+    bloom: [0.3, 0.5, 0.9], player: [0.25, 0.4], rays: { color: "#fff0d8", strength: 0.35 }, face: LIGHT_AZ, weather: "snow",
+  },
+
 };
 
 export class McWorld {
@@ -546,11 +664,12 @@ export class McWorld {
       if (this.wantDist) cam.position.sub(tgt).setLength(this.wantDist).add(tgt);
       const out = update();
       this.wantDist = cam.position.distanceTo(tgt);
-      const land = this.sets.land;
-      if (land && land.visible && this.landMeshes) {
+      // every outdoor world: keep the camera in front of its blocks
+      const land = Object.values(this.sets).find(s => s.visible && s.userData.solid);
+      if (land) {
         dir.subVectors(cam.position, tgt).normalize();
         ray.set(tgt, dir); ray.far = this.wantDist;
-        const hit = ray.intersectObjects(this.landMeshes, false)[0];
+        const hit = ray.intersectObjects(land.userData.solid, false)[0];
         if (hit) cam.position.copy(tgt).addScaledVector(dir, Math.max(ctl.minDistance * 0.6, hit.distance - 6));
       }
       return out;
@@ -828,7 +947,7 @@ export class McWorld {
       cells.push(["stone", x, h + 1, z], ["stone", x + 1, h + 1, z], ["stone", x, h + 2, z]);
     }
     const g = this.buildBlocks(dedupe(cells), 21);
-    this.landMeshes = g.children.filter(o => o.isInstancedMesh);
+    this.landMeshes = g.userData.solid = g.children.filter(o => o.isInstancedMesh);
     // water: one big plane, fades into the fog
     const wt = this.makeTexture("water");
     wt.wrapS = wt.wrapT = THREE.RepeatWrapping; wt.repeat.set(140, 140); wt.minFilter = THREE.NearestFilter;
@@ -841,6 +960,111 @@ export class McWorld {
     this.water = water;
     this.waterSimple = water.material;
     this.disposables.push(wt, water.geometry, water.material);
+    return g;
+  }
+
+  /**
+   * The other worlds, built like the island: a free clearing for the figure, terrain further out.
+   * kind: "nether" (netherrack, lava lake, glowstone), "end" (end stone island, obsidian pillars with
+   * crystals, the void around), "ocean" (sea floor with kelp, seagrass and coral), "snow" (snowy hills,
+   * spruces, a frozen lake).
+   */
+  buildTerrain(kind) {
+    const cells = [], n = valueNoise({ nether: 11, end: 13, ocean: 17, snow: 19 }[kind]), r = rng(kind.length * 31), R = kind === "end" ? 24 : 30;
+    const lake = [Math.sin(LIGHT_AZ) * 14, Math.cos(LIGHT_AZ) * 14];
+    const ang = (x, z) => Math.abs(Math.atan2(Math.sin(Math.atan2(x, z) - LIGHT_AZ), Math.cos(Math.atan2(x, z) - LIGHT_AZ)));
+    const tops = new Map();
+    const height = (x, z) => {
+      const d = Math.hypot(x, z), dl = Math.hypot(x - lake[0], z - lake[1]) - n(x, z, 3, 3) * 1.6;
+      if ((kind === "nether" || kind === "snow") && dl < 5.2) return -2;
+      if (d <= 7) return 0;
+      const ramp = Math.min(1, (d - 7) / 6), rough = kind === "snow" ? 9 : kind === "nether" ? 7 : kind === "ocean" ? 3 : 1.5;
+      let h = ((n(x, z, 6, 6) - 0.32) * rough * 0.7 + (d > 13 ? (d - 13) * (kind === "snow" ? 0.7 : kind === "end" ? 0 : 0.4) : 0)) * ramp;
+      if (ang(x, z) < 0.6 && kind !== "end") h *= 0.25;
+      if ((kind === "nether" || kind === "snow") && dl < 9) h *= Math.max(0, (dl - 5.2) / 3.8);
+      if (kind === "end") return Math.round(Math.max(0, Math.min(2, h)));
+      return Math.round(Math.max(-1, Math.min(kind === "snow" ? 12 : 8, h)));
+    };
+    for (let x = -R; x <= R; x++) for (let z = -R; z <= R; z++) {
+      const d = Math.hypot(x, z);
+      if (d > R + 0.5) continue;
+      // the End island has a ragged edge and thins out towards the void
+      if (kind === "end" && d > R - 4 + n(x, z, 4, 4) * 4) continue;
+      const h = height(x, z);
+      tops.set(x + "," + z, h);
+      const depth = kind === "end" ? 2 + Math.round((R - d) / 3) : 3;
+      for (let y = Math.min(h, -1) - depth; y <= h; y++) {
+        let type;
+        if (kind === "nether") type = y === h && n(x, z, 3, 3, 4) > 0.68 ? "soulSand" : "netherrack";
+        else if (kind === "end") type = "endStone";
+        else if (kind === "ocean") type = y === h ? (n(x, z, 4, 4, 2) > 0.62 ? "gravel" : "sand") : y >= h - 2 ? "sand" : "stone";
+        else type = y === h ? (h >= 7 && n(x, z, 2, 2, 9) > 0.55 ? "stone" : "snowGrass") : y >= h - 2 ? "dirt" : "stone";
+        cells.push([type, x, y, z]);
+      }
+      if (kind === "snow" && h === -2) cells.push(["ice", x, -2, z]);
+    }
+    const spot = (a, d) => { const x = Math.round(Math.sin(a) * d), z = Math.round(Math.cos(a) * d); return [x, z, tops.get(x + "," + z)]; };
+    if (kind === "nether") {
+      // glowstone clusters on netherrack spikes, a few lumps on the ground
+      for (const [a, d, hgt] of [[LIGHT_AZ + 1.6, 15, 6], [LIGHT_AZ - 2.0, 16, 8], [LIGHT_AZ + 2.8, 18, 5], [LIGHT_AZ - 1.1, 21, 9]]) {
+        const [x, z, h] = spot(a, d); if (h === undefined || h < 0) continue;
+        for (let y = 1; y <= hgt; y++) { cells.push(["netherrack", x, h + y, z]); if (y < hgt / 2) cells.push(["netherrack", x + 1, h + y, z]); }
+        for (const [dx, dy, dz] of [[0, 1, 0], [1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [1, 1, 0]]) cells.push(["glowstone", x + dx, h + hgt + dy, z + dz]);
+      }
+      for (const [a, d] of [[LIGHT_AZ + 1.0, 9], [LIGHT_AZ - 1.3, 8.5]]) { const [x, z, h] = spot(a, d); cells.push(["glowstone", x, (h ?? 0) + 1, z]); }
+    } else if (kind === "end") {
+      // obsidian pillars around the island, each with a glowing crystal on top
+      for (let i = 0; i < 6; i++) {
+        const a = LIGHT_AZ + 0.6 + i * (Math.PI * 2 / 6), d = 15 + (i % 2) * 3, [x, z] = spot(a, d), hgt = 10 + ((i * 5) % 9);
+        for (let y = 1; y <= hgt; y++) for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) cells.push(["obsidian", x + dx, y, z + dz]);
+        cells.push(["crystal", x, hgt + 2, z]);
+      }
+    } else if (kind === "ocean") {
+      // kelp columns, seagrass, coral and a small prismarine ruin
+      for (let i = 0; i < 70; i++) {
+        const a = r() * Math.PI * 2, d = 8 + r() * 20, [x, z, h] = spot(a, d);
+        if (h === undefined) continue;
+        if (i < 22) { const k = 4 + Math.floor(r() * 9); for (let y = 1; y <= k; y++) cells.push(["kelp", x, h + y, z]); }
+        else if (i < 56) cells.push(["seagrass", x, h + 1, z]);
+        else { const c = ["coralPink", "coralBlue", "coralYellow"][i % 3]; cells.push([c, x, h + 1, z]); if (r() < 0.5) cells.push([c, x, h + 2, z]); if (r() < 0.5) cells.push([c, x + 1, h + 1, z]); }
+      }
+      for (const [a, d] of [[LIGHT_AZ - 2.3, 15]]) {
+        const [x, z, h] = spot(a, d);
+        for (let dx = 0; dx < 5; dx++) for (let dz = 0; dz < 5; dz++) for (let y = 1; y <= 4; y++) {
+          const wall = dx === 0 || dx === 4 || dz === 0 || dz === 4;
+          if (wall && !(y > 2 && (dx + dz) % 3 === 0) && !(dz === 0 && dx === 2 && y < 3)) cells.push(["prismarine", x + dx, (h ?? 0) + y, z + dz]);
+        }
+      }
+    } else {
+      // spruces: tall, cone shaped, snow on the top
+      for (const [a, d] of [[LIGHT_AZ + 1.9, 14], [LIGHT_AZ + 2.6, 17], [LIGHT_AZ - 2.2, 14], [LIGHT_AZ - 1.6, 19], [LIGHT_AZ + 3.4, 12]]) {
+        const [x, z, h] = spot(a, d); if (h === undefined || h < 0) continue;
+        const trunk = 7 + Math.floor(r() * 3);
+        for (let y = 1; y <= trunk; y++) cells.push(["spruceLog", x, h + y, z]);
+        for (let dy = 3; dy <= trunk + 1; dy++) {
+          // wide at the bottom, narrow at the top, every other layer a little smaller (the stepped spruce look)
+          let rad = dy > trunk ? 0 : Math.min(3, Math.max(1, Math.round((trunk - dy) / 2.5)));
+          if (dy % 2 === 0 && rad > 0) rad -= 1;
+          for (let dx = -rad; dx <= rad; dx++) for (let dz = -rad; dz <= rad; dz++) {
+            if (Math.abs(dx) + Math.abs(dz) > rad + 0.5 || (dx === 0 && dz === 0 && dy <= trunk)) continue;
+            cells.push(["spruceLeaves", x + dx, h + dy, z + dz]);
+          }
+        }
+        cells.push(["snow", x, h + trunk + 2, z]);
+      }
+    }
+    const g = this.buildBlocks(dedupe(cells), { nether: 31, end: 37, ocean: 41, snow: 43 }[kind]);
+    g.userData.solid = g.children.filter(o => o.isInstancedMesh);
+    if (kind === "nether") {
+      // a glowing lava lake: one plane, bright enough for the bloom
+      const lt = this.makeTexture("lava");
+      lt.wrapS = lt.wrapT = THREE.RepeatWrapping; lt.repeat.set(140, 140); lt.minFilter = THREE.NearestFilter;
+      const lava = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000),
+        new THREE.MeshStandardMaterial({ map: lt, emissiveMap: lt, emissive: new THREE.Color("#ff7a1a"), emissiveIntensity: 1.3, roughness: 0.6 }));
+      lava.rotation.x = -Math.PI / 2; lava.position.y = FEET - 3;
+      g.add(lava);
+      this.disposables.push(lt, lava.geometry, lava.material);
+    }
     return g;
   }
 
@@ -1003,7 +1227,7 @@ export class McWorld {
   set(name) {
     if (!this.sets[name]) {
       const g = name === "roomWhite" ? this.buildRoom(true) : name === "roomDark" ? this.buildRoom(false) : name === "land" ? this.buildLand()
-        : name === "beam" ? this.buildBeam() : null;
+        : name === "beam" ? this.buildBeam() : ["nether", "end", "ocean", "snow"].includes(name) ? this.buildTerrain(name) : null;
       g.visible = false;
       this.root.add(g);
       this.sets[name] = g;
@@ -1085,8 +1309,11 @@ export class McWorld {
     this.syncWeather();
   }
   syncWeather() {
-    const type = this.weatherType || "clear";
-    const outdoors = LOOKS[this.lookId] && LOOKS[this.lookId].set === "land";
+    const look = LOOKS[this.lookId] || {};
+    // some worlds bring their own: bubbles under water, ash in the Nether; snow falls by default on the mountain
+    const chosen = this.weatherType || "clear";
+    const type = look.forceWeather || (chosen !== "clear" ? chosen : look.weather || "clear");
+    const outdoors = look.set && !look.set.startsWith("room");
     if (this.weather && this.weather.type !== type) {
       this.root.remove(this.weather.obj);
       this.weather.obj.geometry.dispose(); this.weather.obj.material.dispose();
@@ -1098,7 +1325,7 @@ export class McWorld {
   }
   buildWeather(type) {
     const R = 46, top = FEET + 60, bottom = FEET - 2, r = rng(type.length * 977);
-    const count = { rain: 2400, snow: 1600, fireflies: 110, leaves: 220 }[type];
+    const count = { rain: 2400, snow: 1600, fireflies: 110, leaves: 220, bubbles: 500, ash: 700 }[type];
     const parts = [];
     for (let i = 0; i < count; i++) {
       const a = r() * Math.PI * 2, d = Math.sqrt(r()) * R;
@@ -1115,14 +1342,16 @@ export class McWorld {
       const g = new THREE.BufferGeometry();
       g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.setAttribute("color", new THREE.BufferAttribute(col, 3));
       const leafCols = ["#4f8738", "#6b9a3a", "#a8842d", "#c0602a"].map(c => new THREE.Color(c));
+      const ashCols = ["#5a5452", "#7a7270", "#ff8a2a", "#3c3634"].map(c => new THREE.Color(c));
       parts.forEach((q, i) => {
-        const c = type === "snow" ? new THREE.Color("#ffffff") : type === "fireflies" ? new THREE.Color("#d8ff6a") : leafCols[i % 4];
+        const c = type === "snow" ? new THREE.Color("#ffffff") : type === "fireflies" ? new THREE.Color("#d8ff6a")
+          : type === "bubbles" ? new THREE.Color("#d8f4ff") : type === "ash" ? ashCols[i % 4] : leafCols[i % 4];
         col.set([c.r, c.g, c.b], i * 3);
         if (type === "fireflies") { q.y = FEET + 2 + r() * 14; q.x *= 0.6; q.z *= 0.6; }
       });
       obj = new THREE.Points(g, new THREE.PointsMaterial({
-        size: { snow: 0.9, fireflies: 1.5, leaves: 0.9 }[type], vertexColors: true, transparent: true, depthWrite: false,
-        map: type === "leaves" ? null : this.glowTex(), opacity: type === "snow" ? 0.95 : 1,
+        size: { snow: 0.9, fireflies: 1.5, leaves: 0.9, bubbles: 0.8, ash: 0.55 }[type], vertexColors: true, transparent: true, depthWrite: false,
+        map: type === "leaves" || type === "ash" ? null : this.glowTex(), opacity: type === "snow" ? 0.95 : type === "bubbles" ? 0.75 : 1,
         blending: type === "fireflies" ? THREE.AdditiveBlending : THREE.NormalBlending, fog: type !== "fireflies",
       }));
     }
@@ -1135,7 +1364,7 @@ export class McWorld {
   }
   updateWeather(w, t, dt) {
     const a = w.obj.geometry.attributes.position, still = reduce();
-    const fall = { rain: 95, snow: 7, fireflies: 0, leaves: 5 }[w.type] * (still ? 0 : 1);
+    const fall = { rain: 95, snow: 7, fireflies: 0, leaves: 5, bubbles: -9, ash: 2.5 }[w.type] * (still ? 0 : 1);
     w.parts.forEach((q, i) => {
       if (w.type === "fireflies") {
         const x = q.x + Math.sin(t * 0.4 * q.s + q.p) * 3, y = q.y + Math.sin(t * 0.7 * q.s + q.p * 2) * 1.5, z = q.z + Math.cos(t * 0.33 * q.s + q.p) * 3;
@@ -1147,7 +1376,9 @@ export class McWorld {
       }
       q.y -= fall * q.s * dt;
       if (q.y < w.bottom) q.y += w.top - w.bottom;
-      const sway = w.type === "snow" ? Math.sin(t * 0.8 + q.p) * 1.2 : w.type === "leaves" ? Math.sin(t * 1.4 + q.p) * 2.2 : 0;
+      if (q.y > w.top) q.y -= w.top - w.bottom;   // bubbles rise
+      const sway = w.type === "snow" ? Math.sin(t * 0.8 + q.p) * 1.2 : w.type === "leaves" ? Math.sin(t * 1.4 + q.p) * 2.2
+        : w.type === "bubbles" ? Math.sin(t * 3 + q.p) * 0.4 : w.type === "ash" ? Math.sin(t * 0.5 + q.p) * 2 : 0;
       if (w.type === "rain") {
         a.setXYZ(i * 2, q.x, q.y, q.z);
         a.setXYZ(i * 2 + 1, q.x + 0.25, q.y + 2.6, q.z + 0.1);

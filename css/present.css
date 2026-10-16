@@ -68,6 +68,19 @@ body.presenting .top .tagline { animation: none; }
 .present[data-scene="mc-night"] {
   --pr-bg: #03060f; --pr-fg: #e8f0ff; --pr-muted: rgba(232,240,255,.66); --pr-ui: rgba(6,12,28,.5); --pr-ui-line: rgba(180,205,255,.18); --pr-ui-on: #d6e4ff; --pr-ui-on-fg: #06122a;
 }
+.present[data-scene="mc-nether"] {
+  --pr-bg: #2a0604; --pr-fg: #fff1e6; --pr-muted: rgba(255,241,230,.7); --pr-ui: rgba(40,8,4,.45); --pr-ui-line: rgba(255,190,150,.2); --pr-ui-on: #ffb067; --pr-ui-on-fg: #2a0a02;
+}
+.present[data-scene="mc-end"] {
+  --pr-bg: #06030c; --pr-fg: #f1eaff; --pr-muted: rgba(241,234,255,.66); --pr-ui: rgba(20,10,34,.5); --pr-ui-line: rgba(210,190,255,.2); --pr-ui-on: #e6d8ff; --pr-ui-on-fg: #160a2a;
+}
+.present[data-scene="mc-ocean"] {
+  --pr-bg: #0a3a6a; --pr-fg: #eaf8ff; --pr-muted: rgba(234,248,255,.72); --pr-ui: rgba(4,30,56,.42); --pr-ui-line: rgba(170,220,255,.22); --pr-ui-on: #bfeaff; --pr-ui-on-fg: #032036;
+}
+.present[data-scene="mc-snow"] {
+  --pr-bg: #e8eef6; --pr-fg: #10161e; --pr-muted: rgba(16,22,30,.66); --pr-ui: rgba(255,255,255,.62); --pr-ui-line: rgba(16,22,30,.12); --pr-ui-on: #10161e; --pr-ui-on-fg: #fff;
+}
+.present[data-scene="mc-snow"] .pr-name { text-shadow: 0 1px 14px rgba(255,255,255,.7); }
 .present[data-group="minecraft"] .pr-bg, .present[data-group="minecraft"] .pr-big, .present[data-group="minecraft"] .pr-floor, .present[data-group="minecraft"] .pr-fx { display: none; }
 .present[data-group="minecraft"] .pr-name { text-shadow: 0 2px 18px rgba(0,0,0,.35); }
 .present[data-scene="mc-white"] .pr-name { text-shadow: 0 1px 14px rgba(255,255,255,.7); }
@@ -176,6 +189,10 @@ body.hdr-open .pr-menu { background: var(--pr-ui-on); color: var(--pr-ui-on-fg);
 .sw-mc-dark { border-radius: 3px !important; background: radial-gradient(circle at 50% 30%, #fff1d6 0 18%, #2b2830 22%); }
 .sw-mc-sunrise { border-radius: 3px !important; background: linear-gradient(180deg, #3a5a92, #ffb27a 55%, #5f9d3d 56%); }
 .sw-mc-night { border-radius: 3px !important; background: linear-gradient(180deg, #03060f, #13213d 60%, #3f7f2c 61%); }
+.sw-mc-nether { border-radius: 3px !important; background: linear-gradient(180deg, #2a0604, #6b1a10 60%, #ff7a1a 61%); }
+.sw-mc-end { border-radius: 3px !important; background: linear-gradient(180deg, #06030c, #2a1240 60%, #e3e0a8 61%); }
+.sw-mc-ocean { border-radius: 3px !important; background: linear-gradient(180deg, #1a6aa0, #0a3a6a 60%, #d8cd97 61%); }
+.sw-mc-snow { border-radius: 3px !important; background: linear-gradient(180deg, #6f9ad0, #e8eef6 60%, #ffffff 61%); }
 .sw-night { background: radial-gradient(circle at 70% 30%, #dbe6ff 0 22%, #0b1a3d 24%); }
 .pr-icon:focus-visible, .pr-nav:focus-visible, .pr-pill:focus-visible { outline: 2px solid var(--pr-fg); outline-offset: 2px; }
 
