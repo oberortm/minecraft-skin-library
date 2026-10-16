@@ -296,7 +296,7 @@ body.hdr-open .pr-menu { background: var(--pr-ui-on); color: var(--pr-ui-on-fg);
 .pr-fav { flex: none; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; cursor: pointer; pointer-events: auto;
   border: 1px solid var(--pr-ui-line); background: var(--pr-ui); color: var(--pr-fg); backdrop-filter: blur(14px); transition: background .3s, color .3s, transform .2s; }
 .pr-fav[hidden] { display: none; }
-.pr-fav[aria-pressed="true"] { background: #f5b301; color: #2a1c00; border-color: transparent; }
+.pr-fav[aria-pressed="true"] { background: var(--pr-ui-on); color: var(--pr-ui-on-fg); border-color: transparent; }
 .pr-fav:hover { transform: scale(1.08); }
 .pr-fav.pop { animation: pr-fav-pop .45s cubic-bezier(.2, 1.6, .4, 1); }
 @keyframes pr-fav-pop { 40% { transform: scale(1.35) rotate(-12deg); } }

@@ -210,7 +210,10 @@ const DISPLAY = {
   crossbow: { r: [0, -90, 45], t: [0, 2, 1], s: 0.9 },
   shield: { r: [0, 90, 0], t: [10, 6, -4], s: 1 },
 };
-for (const k of ["sword", "axe", "pickaxe", "spear", "mace", "trident"]) DISPLAY[k] = DISPLAY.handheld;
+for (const k of ["sword", "axe", "pickaxe", "mace"]) DISPLAY[k] = DISPLAY.handheld;
+// spear and trident are long weapons in the game: about twice the size, held in the lower third of the shaft
+// (fix: shift in the arm's space so that point of the shaft sits in the fist)
+DISPLAY.spear = DISPLAY.trident = { r: [0, -90, 55], t: [0, 4, 0.5], s: 1.8, fix: [0, 1, 1.9] };
 for (const k of ["totem", "torch", "map"]) DISPLAY[k] = DISPLAY.generated;
 
 /**
@@ -236,6 +239,7 @@ function rightHeld(THREE, d) {
   m.multiply(t.makeRotationFromEuler(new THREE.Euler(d.r[0] * D, k * d.r[1] * D, k * d.r[2] * D, "XYZ")));
   m.multiply(t.makeScale(d.s, d.s, d.s));
   m.multiply(t.makeTranslation(-8, -8, -8));
+  if (d.fix) m.premultiply(t.makeTranslation(d.fix[0], d.fix[1], d.fix[2]));
   return m;
 }
 
@@ -350,6 +354,8 @@ export function applyItems(viewer, THREE, hands, pack) {
       const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: tex(cv), roughness: 0.6 }));
       // the sprite as the game builds it: x 0..16, y 0..16 with the top of the picture up, 1 px thick around z = 8
       mesh.position.set(0, 16, 8);
+      // the big spear and trident keep the thickness of a normal item
+      if (h.item === "spear" || h.item === "trident") mesh.scale.z = 0.85 / 1.8;
       holder.add(mesh); meshes.push(mesh);
     }
     if (h.glint) {

@@ -564,7 +564,7 @@ const PHOTO_KEY = "skin-library-photo";
 function photoPrefs() { try { return { bg: "scene", size: "2", ...JSON.parse(localStorage.getItem(PHOTO_KEY) || "{}") }; } catch (e) { return { bg: "scene", size: "2" }; } }
 function syncPhotoUi() {
   const p = photoPrefs(), mc = st.group === "minecraft";
-  document.querySelectorAll("#prPhotoBg button").forEach(b => { b.setAttribute("aria-pressed", String(b.dataset.v === (mc ? "scene" : p.bg))); b.disabled = mc && b.dataset.v === "clear"; });
+  document.querySelectorAll("#prPhotoBg button").forEach(b => { b.setAttribute("aria-pressed", String(b.dataset.v === p.bg)); });
   document.querySelectorAll("#prPhotoSize button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === p.size)));
 }
 function setPhotoPref(k, v) {
@@ -614,7 +614,7 @@ async function takePhoto() {
     title: t("savePhoto"),
     filename: `${(skin ? skin.name : "skin").replace(/[^\w\-]+/g, "_")}-${st.scene}.png`,
     make: async progress => {
-      const p = photoPrefs(), mc = !!st.world, clear = !mc && p.bg === "clear";
+      const p = photoPrefs(), mc = !!st.world, clear = p.bg === "clear";
       const r = v.renderer, pr0 = r.getPixelRatio();
       const css = v.canvas.getBoundingClientRect();
       // stay within what the GPU can hold
@@ -622,14 +622,28 @@ async function takePhoto() {
       const scale = Math.min(Number(p.size) || 1, maxTex / (Math.max(css.width, css.height) * pr0));
       const out = document.createElement("canvas");
       progress(0.15);
+      const hidden = [], fog = v.scene.fog, bg = v.scene.background, clearCol = r.getClearColor(new (st.groupTHREE || (await load3d()).THREE).Color()), clearA = r.getClearAlpha();
       try {
         r.setPixelRatio(pr0 * scale); v.updateComposerSize();
-        v.render();
+        if (clear) {
+          // only the figure(s): hide everything of the world but its lights, and draw straight to the canvas
+          // (the post-processing chain does not keep the transparency)
+          if (st.world) st.world.root.traverse(o => { if ((o.isMesh || o.isPoints || o.isLine || o.isSprite) && o.visible) { o.visible = false; hidden.push(o); } });
+          v.scene.fog = null; v.scene.background = null;
+          r.setRenderTarget(null); r.setClearColor(0x000000, 0); r.clear();
+          // classic scenes show the skin colours as they are (no colour conversion on the way to the screen)
+          const T = st.groupTHREE || (await load3d()).THREE, ocs = r.outputColorSpace;
+          if (!st.world) r.outputColorSpace = T.LinearSRGBColorSpace;
+          r.render(v.scene, v.camera);
+          r.outputColorSpace = ocs;
+        } else v.render();
         out.width = v.canvas.width; out.height = v.canvas.height;
         const ctx = out.getContext("2d");
         if (!mc && !clear) paintClassicBg(ctx, out.width, out.height);
         ctx.drawImage(v.canvas, 0, 0);   // right after rendering, before the frame is handed to the screen
       } finally {
+        for (const o of hidden) o.visible = true;
+        v.scene.fog = fog; v.scene.background = bg; r.setClearColor(clearCol, clearA);
         r.setPixelRatio(pr0); v.updateComposerSize(); v.render();
       }
       progress(0.6);
