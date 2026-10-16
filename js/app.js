@@ -14,7 +14,29 @@ import { encodeSkin, decodeSkin, shareBase, shareQR, codeInAddress } from "./sha
 import { drawQR } from "./qr.js";
 
 // filters: slim/classic are "either", fav narrows to favourites; none active = all
-const state = { skins: [], view: "front", filters: { slim: false, classic: false, fav: false }, sort: "new", search: "", current: null };
+const state = { skins: [], view: "front", filters: { slim: false, classic: false, fav: false }, tagFilter: [], sort: "new", search: "", current: null };
+
+// ---------- tags ----------
+/** Clean a list of tags: trimmed, at most 24 characters, no duplicates (ignoring case), at most 12. */
+export function normTags(list) {
+  const out = [], seen = new Set();
+  for (const raw of Array.isArray(list) ? list : []) {
+    const tg = String(raw || "").replace(/\s+/g, " ").trim().slice(0, 24);
+    if (!tg || seen.has(tg.toLowerCase())) continue;
+    seen.add(tg.toLowerCase()); out.push(tg);
+    if (out.length >= 12) break;
+  }
+  return out;
+}
+const hasTag = (s, tg) => (s.tags || []).some(x => x.toLowerCase() === tg.toLowerCase());
+/** Every tag in the library, most used first. */
+function allTags() {
+  const count = new Map();
+  for (const s of state.skins) for (const tg of s.tags || []) {
+    const k = tg.toLowerCase(), e = count.get(k) || [tg, 0]; e[1]++; count.set(k, e);
+  }
+  return [...count.values()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(e => e[0]);
+}
 const UI_KEY = "skin-library-ui";
 
 // ---------- small helpers ----------
@@ -48,13 +70,14 @@ function seg(id, value, onChange) {
 }
 
 function saveUi() {
-  try { localStorage.setItem(UI_KEY, JSON.stringify({ view: state.view, filters: state.filters, sort: state.sort })); } catch (e) { /* ignore */ }
+  try { localStorage.setItem(UI_KEY, JSON.stringify({ view: state.view, filters: state.filters, tags: state.tagFilter, sort: state.sort })); } catch (e) { /* ignore */ }
 }
 function loadUi() {
   let saved = {};
   try { saved = JSON.parse(localStorage.getItem(UI_KEY) || "{}") || {}; } catch (e) { /* ignore */ }
   if (["front", "back", "tex"].includes(saved.view)) state.view = saved.view;
   if (["new", "old", "name"].includes(saved.sort)) state.sort = saved.sort;
+  state.tagFilter = normTags(saved.tags);
   if (saved.filters && typeof saved.filters === "object") for (const k of Object.keys(state.filters)) state.filters[k] = !!saved.filters[k];
   else if (saved.filter in state.filters) state.filters[saved.filter] = true; // older versions had one filter
 }
@@ -62,6 +85,8 @@ function loadUi() {
 function matchesFilters(s) {
   const f = state.filters;
   if ((f.slim || f.classic) && !((f.slim && s.model === "slim") || (f.classic && s.model === "classic"))) return false;
+  // tags narrow down like the star: a skin needs every chosen tag
+  if (!state.tagFilter.every(tg => hasTag(s, tg))) return false;
   return !f.fav || s.fav;
 }
 
@@ -69,7 +94,7 @@ function matchesFilters(s) {
 function setupFilters() {
   const root = $("filterSeg");
   const sync = () => {
-    const none = !Object.values(state.filters).some(Boolean);
+    const none = !Object.values(state.filters).some(Boolean) && !state.tagFilter.length;
     root.querySelectorAll("button[data-v]").forEach(b =>
       b.setAttribute("aria-pressed", String(b.dataset.v === "all" ? none : !!state.filters[b.dataset.v])));
   };
@@ -78,7 +103,7 @@ function setupFilters() {
     const b = e.target.closest("button[data-v]");
     if (!b) return;
     const v = b.dataset.v;
-    if (v === "all") for (const k of Object.keys(state.filters)) state.filters[k] = false;
+    if (v === "all") { for (const k of Object.keys(state.filters)) state.filters[k] = false; state.tagFilter = []; renderTagFilter(); }
     else state.filters[v] = !state.filters[v];
     sync(); saveUi(); renderGrid();
   });
@@ -96,7 +121,7 @@ function visibleSkins() {
   const q = state.search.trim().toLowerCase();
   let list = state.skins.filter(s =>
     matchesFilters(s) &&
-    (!q || s.name.toLowerCase().includes(q)));
+    (!q || s.name.toLowerCase().includes(q) || (s.tags || []).some(tg => tg.toLowerCase().includes(q))));
   const by = {
     new: (a, b) => b.created - a.created,
     old: (a, b) => a.created - b.created,
@@ -136,6 +161,7 @@ function renderGridSoon() {
 }
 
 function renderGrid() {
+  renderTagFilter();
   const grid = $("grid");
   const list = visibleSkins();
   const n = state.skins.length;
@@ -153,10 +179,13 @@ function renderGrid() {
     b.setAttribute("aria-label", t("open") + ": " + skin.name);
     b.innerHTML = `<div class="stage${state.view === "tex" ? " tex" : ""}${is3d ? " is3d" : ""}">${is3d ? "" : "<canvas></canvas>"}</div>
       <div class="card-name"></div>
-      <div class="card-meta"><span class="badge model">${skin.model === "slim" ? t("slim") : t("classic")}</span>${skin.fmt === "64x32" ? `<span class="badge">${t("badgeLegacy")}</span>` : ""}</div>
+      <div class="card-meta"><span class="badge model">${skin.model === "slim" ? t("slim") : t("classic")}</span>${skin.fmt === "64x32" ? `<span class="badge">${t("badgeLegacy")}</span>` : ""}<span class="card-tags"></span></div>
       <div class="card-date">${t("added")} ${new Date(skin.created).toLocaleDateString(getLang())}</div>
       ${skin.fav ? '<svg class="star" aria-hidden="true"><use href="#i-star"/></svg>' : ""}`;
     b.querySelector(".card-name").textContent = skin.name;
+    const tags = skin.tags || [], ct = b.querySelector(".card-tags");
+    for (const tg of tags.slice(0, 2)) { const e = document.createElement("span"); e.className = "badge tag"; e.textContent = "#" + tg; ct.appendChild(e); }
+    if (tags.length > 2) { const e = document.createElement("span"); e.className = "badge tag"; e.textContent = "+" + (tags.length - 2); ct.appendChild(e); }
     if (is3d) {
       const stage = b.querySelector(".stage");
       stage.dataset.side = state.view;
@@ -270,6 +299,44 @@ async function addPlayerSkin() {
   $("playerHit").hidden = true;
 }
 
+// ---------- tags: in the detail sheet and as filter chips in the toolbar ----------
+function renderDetailTags(skin) {
+  $("dTags").replaceChildren(...(skin.tags || []).map(tg => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "chip tag-chip"; b.textContent = "#" + tg;
+    b.title = t("tagRemove", { tag: tg }); b.setAttribute("aria-label", b.title);
+    b.insertAdjacentHTML("beforeend", ' <svg class="ic sm" aria-hidden="true"><use href="#i-x"/></svg>');
+    b.addEventListener("click", async () => {
+      await updateSkin(skin, { tags: (skin.tags || []).filter(x => x !== tg) });
+      renderDetailTags(skin); renderTagFilter();
+    });
+    return b;
+  }));
+  // suggestions: tags used elsewhere that this skin does not have yet
+  $("tagSuggest").replaceChildren(...allTags().filter(tg => !hasTag(skin, tg)).map(tg => { const o = document.createElement("option"); o.value = tg; return o; }));
+}
+function renderTagFilter() {
+  const tags = allTags();
+  // a chosen tag that no skin has any more stops filtering
+  state.tagFilter = state.tagFilter.filter(tg => tags.some(x => x.toLowerCase() === tg.toLowerCase()));
+  $("tagFilter").hidden = !tags.length;
+  $("tagChips").replaceChildren(...tags.map(tg => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "chip"; b.textContent = "#" + tg;
+    b.setAttribute("aria-pressed", String(state.tagFilter.some(x => x.toLowerCase() === tg.toLowerCase())));
+    b.addEventListener("click", () => {
+      const on = state.tagFilter.some(x => x.toLowerCase() === tg.toLowerCase());
+      state.tagFilter = on ? state.tagFilter.filter(x => x.toLowerCase() !== tg.toLowerCase()) : [...state.tagFilter, tg];
+      saveUi(); renderTagFilter(); renderGrid();
+    });
+    return b;
+  }));
+  // "All" is only pressed when nothing at all is filtered
+  const none = !Object.values(state.filters).some(Boolean) && !state.tagFilter.length;
+  const all = document.querySelector('#filterSeg button[data-v="all"]');
+  if (all) all.setAttribute("aria-pressed", String(none));
+}
+
 // ---------- share a skin as a link / QR code ----------
 async function openShare(skin) {
   const d = $("shareDlg");
@@ -339,7 +406,7 @@ async function importBackup(file) {
     fresh.push({
       id: typeof s.id === "string" ? s.id : newId(), name: String(s.name || t("untitled")).slice(0, 60), data: s.data,
       model: s.model === "slim" ? "slim" : "classic", fmt: s.fmt === "64x32" ? "64x32" : "64x64",
-      fav: !!s.fav, notes: String(s.notes || ""), created: Number(s.created) || Date.now(), updated: Number(s.updated) || Date.now(),
+      fav: !!s.fav, notes: String(s.notes || ""), tags: normTags(s.tags), created: Number(s.created) || Date.now(), updated: Number(s.updated) || Date.now(),
     });
   }
   if (fresh.length) {
@@ -418,6 +485,7 @@ async function openDetail(id) {
   $("dFmt").hidden = skin.fmt !== "64x32"; $("dFmt").textContent = t("badgeLegacy");
   $("dLegacy").hidden = skin.fmt !== "64x32";
   $("dNotes").value = skin.notes || "";
+  renderDetailTags(skin);
   $("dHow").innerHTML = t("mcHow", { model: skin.model === "slim" ? t("modelSlim") : t("modelClassic") });
   $("dAdded").textContent = t("added") + ": " + new Date(skin.created).toLocaleDateString(getLang());
   disarmDelete();
@@ -478,6 +546,14 @@ function setupDetail() {
     e.target.value = name; updateSkin(skin, { name });
   });
   on("dNotes", "change", e => { const skin = byId(state.current); if (skin) updateSkin(skin, { notes: e.target.value }); });
+  on("dTagForm", "submit", async e => {
+    e.preventDefault();
+    const skin = byId(state.current), v = $("dTagInput").value;
+    if (!skin || !v.trim()) return;
+    await updateSkin(skin, { tags: normTags([...(skin.tags || []), ...v.split(",")]) });
+    $("dTagInput").value = "";
+    renderDetailTags(skin); renderTagFilter();
+  });
   on("dFav", "click", () => { const skin = byId(state.current); if (!skin) return; updateSkin(skin, { fav: !skin.fav }); syncFav(skin); });
   const toggle = (id, fn) => on(id, "click", e => {
     const b = e.currentTarget, on = b.getAttribute("aria-pressed") !== "true";
@@ -627,6 +703,7 @@ async function boot() {
   window.__skinLibraryBooted = true;
   try { state.skins = await db.all(); } catch (e) { state.skins = []; toast(t("storageError"), true); }
   safe("grid", renderGrid);
+  safe("tags", renderTagFilter);
   safe("share", () => {
     on("shCopy", "click", copyShareLink);
     on("shClose", "click", () => $("shareDlg").close());

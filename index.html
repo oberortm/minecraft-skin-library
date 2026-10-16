@@ -96,6 +96,7 @@
     <label class="tool-group"><span class="seg-label" data-i18n="sort"></span>
       <select id="sortSelect"><option value="new" data-i18n="sortNew"></option><option value="old" data-i18n="sortOld"></option><option value="name" data-i18n="sortName"></option></select></label>
     <span class="count" id="countLabel" aria-live="polite"></span>
+    <div class="tool-group tag-filter" id="tagFilter" hidden><span class="seg-label" data-i18n="tags"></span><div class="tag-chips" id="tagChips"></div></div>
   </div>
 
   <main>
@@ -280,6 +281,11 @@
         </div>
         <div class="mc-how"><h3 data-i18n="mcHowTitle"></h3><p id="dHow"></p></div>
         <label class="notes"><h3 data-i18n="notes"></h3><textarea id="dNotes" rows="3" data-i18n-ph="notesPh"></textarea></label>
+        <div class="tags-edit"><h3 data-i18n="tags"></h3>
+          <div class="tag-list" id="dTags"></div>
+          <form class="tag-form" id="dTagForm"><input id="dTagInput" list="tagSuggest" maxlength="60" autocomplete="off" data-i18n-ph="tagAddPh" data-i18n-title="tagAddPh"><button class="btn" type="submit" data-i18n="tagAdd"></button></form>
+          <datalist id="tagSuggest"></datalist>
+        </div>
         <p class="hint" id="dAdded"></p>
       </div>
     </div>

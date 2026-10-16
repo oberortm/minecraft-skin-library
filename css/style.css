@@ -374,3 +374,15 @@ h3 { margin: 0; font: 500 11px var(--f-mono); text-transform: uppercase; letter-
 .sh-qr canvas { width: min(320px, 100%); height: auto; image-rendering: pixelated; border-radius: 10px; }
 .sd-body { display: grid; grid-template-columns: minmax(0, 220px) minmax(0, 1fr); gap: 16px; align-items: center; }
 @media (max-width: 520px) { .sd-body { grid-template-columns: minmax(0, 1fr); } }
+
+/* tags */
+.tag-filter { flex-wrap: wrap; }
+.tag-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.badge.tag { background: var(--accent-soft); color: var(--accent); }
+.card-tags { display: contents; }
+.tags-edit { display: grid; gap: 8px; }
+.tag-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag-list:empty { display: none; }
+.tag-chip .ic { width: 12px; height: 12px; opacity: .7; }
+.tag-form { display: flex; gap: 8px; }
+.tag-form input { flex: 1; min-width: 0; padding: 8px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: inherit; font: inherit; }
