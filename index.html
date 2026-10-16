@@ -274,6 +274,7 @@
           <button class="btn" id="dPresent"><svg class="ic"><use href="#i-play"/></svg><span data-i18n="present"></span></button>
           <button class="btn" id="dExport" data-i18n="exportPng"></button>
           <button class="btn" id="dPfp" data-i18n="pfpOpen"></button>
+          <button class="btn" id="dShare" data-i18n="share"></button>
           <button class="btn" id="dDup" data-i18n="duplicate"></button>
           <button class="btn danger" id="dDelete" data-i18n="delete"></button>
         </div>
@@ -302,6 +303,30 @@
       </div>
       <p class="hint" id="svSaved" hidden data-i18n="saveStarted"></p>
     </div>
+  </div>
+</dialog>
+
+<!-- Share a skin as a link / QR code -->
+<dialog id="shareDlg" class="sheet narrow" aria-labelledby="shTitle">
+  <div class="sheet-inner">
+    <div class="sheet-top"><h2 class="sheet-title" id="shTitle"></h2><span class="spacer"></span>
+      <button class="btn icon-only" id="shClose" data-i18n-title="close"><svg class="ic"><use href="#i-x"/></svg></button></div>
+    <p class="hint" data-i18n="shareIntro"></p>
+    <div class="row sh-row"><input id="shLink" readonly aria-label="Link"><button class="btn primary" id="shCopy" type="button" data-i18n="shareCopy"></button></div>
+    <p class="hint" id="shLen"></p>
+    <div class="sh-qr" id="shQrWrap" hidden><canvas id="shQr"></canvas><button class="btn" id="shSaveQr" type="button" data-i18n="shareSaveQr"></button></div>
+    <p class="hint" id="shQrNote" hidden data-i18n="shareQrTooBig"></p>
+  </div>
+</dialog>
+<dialog id="sharedDlg" class="sheet narrow" aria-labelledby="sdTitle">
+  <div class="sheet-inner">
+    <h2 class="sheet-title" id="sdTitle" data-i18n="sharedTitle"></h2>
+    <div class="sd-body">
+      <div class="flat2"><figure><div class="stage"><canvas id="sdFront" width="16" height="32"></canvas></div><figcaption data-i18n="front"></figcaption></figure>
+        <figure><div class="stage"><canvas id="sdBack" width="16" height="32"></canvas></div><figcaption data-i18n="back"></figcaption></figure></div>
+      <div><b id="sdName"></b> <span class="badge" id="sdModel"></span><p class="hint" data-i18n="sharedIntro"></p></div>
+    </div>
+    <div class="row ex-actions"><button class="btn" id="sdCancel" type="button" data-i18n="sharedSkip"></button><button class="btn primary" id="sdAdd" type="button" data-i18n="playerAdd"></button></div>
   </div>
 </dialog>
 
@@ -462,6 +487,8 @@
     "./js/cinema.js": "./js/cinema.js?v=53",
     "./js/saver.js": "./js/saver.js?v=53",
     "./js/voxel.js": "./js/voxel.js?v=53",
+    "./js/share.js": "./js/share.js?v=53",
+    "./js/qr.js": "./js/qr.js?v=53",
     "./js/mcworld.js": "./js/mcworld.js?v=53",
     "skinview3d": "./vendor/skinview3d@3.0.1/skinview3d.js",
     "skinview-utils": "./vendor/skinview-utils@0.7.1/index.js",
@@ -507,6 +534,8 @@
 <link rel="modulepreload" href="js/cinema.js?v=53">
 <link rel="modulepreload" href="js/saver.js?v=53">
 <link rel="modulepreload" href="js/voxel.js?v=53">
+<link rel="modulepreload" href="js/share.js?v=53">
+<link rel="modulepreload" href="js/qr.js?v=53">
 <link rel="modulepreload" href="js/pack.js?v=53">
 <script type="module" src="js/app.js?v=53"></script>
 </body>

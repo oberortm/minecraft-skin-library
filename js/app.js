@@ -9,7 +9,9 @@ import { $, on, safe, setErrorReporter } from "./dom.js";
 import { load3d, pixelRatio } from "./view3d.js";
 import { isPlayerName, lookupPlayer } from "./player.js";
 import { openPfp, setupPfp } from "./pfp.js";
-import { setupSaver } from "./saver.js";
+import { setupSaver, saveWithPreview, canvasBlob } from "./saver.js";
+import { encodeSkin, decodeSkin, shareBase, shareQR, codeInAddress } from "./share.js";
+import { drawQR } from "./qr.js";
 
 // filters: slim/classic are "either", fav narrows to favourites; none active = all
 const state = { skins: [], view: "front", filters: { slim: false, classic: false, fav: false }, sort: "new", search: "", current: null };
@@ -268,6 +270,53 @@ async function addPlayerSkin() {
   $("playerHit").hidden = true;
 }
 
+// ---------- share a skin as a link / QR code ----------
+async function openShare(skin) {
+  const d = $("shareDlg");
+  $("shTitle").textContent = t("shareTitle") + " – " + skin.name;
+  $("shLink").value = t("shareMaking");
+  $("shQrWrap").hidden = true; $("shQrNote").hidden = true;
+  d.showModal();
+  const code = await encodeSkin(skin);
+  const link = shareBase() + code;
+  $("shLink").value = link;
+  $("shLen").textContent = t("shareLength", { n: link.length.toLocaleString(getLang()) });
+  const qr = shareQR(code);
+  if (qr) { drawQR($("shQr"), qr, 4); $("shQrWrap").hidden = false; }
+  else $("shQrNote").hidden = false;
+  d.dataset.name = skin.name;
+}
+async function copyShareLink() {
+  const v = $("shLink").value;
+  try { await navigator.clipboard.writeText(v); }
+  catch (e) { $("shLink").select(); document.execCommand && document.execCommand("copy"); }
+  toast(t("shareCopied"));
+}
+/** Opened with a share link: preview, then add it (or not). */
+async function checkSharedLink() {
+  const code = codeInAddress();
+  if (!code) return;
+  // the skin is in the link only once: take it out of the address bar
+  history.replaceState(null, "", location.pathname + location.search);
+  let skin;
+  try { skin = await decodeSkin(code); }
+  catch (e) { toast(t("sharedBroken"), true); return; }
+  const img = await loadImage(skin.data);
+  renderFigure($("sdFront"), img, skin.model, "front");
+  renderFigure($("sdBack"), img, skin.model, "back");
+  $("sdName").textContent = skin.name || t("untitled");
+  $("sdModel").textContent = skin.model === "slim" ? t("slim") : t("classic");
+  $("sharedDlg").showModal();
+  $("sdAdd").onclick = async () => {
+    const blob = await (await fetch(skin.data)).blob();
+    await importFiles([new File([blob], (skin.name || t("untitled")) + ".png", { type: "image/png" })]);
+    // keep the model the sender chose (detection can guess wrong on some slim skins)
+    const added = state.skins[state.skins.length - 1];
+    if (added && added.data === skin.data && added.model !== skin.model) { await updateSkin(added, { model: skin.model }); renderGrid(); }
+    $("sharedDlg").close();
+  };
+}
+
 // ---------- backup ----------
 function exportBackup() {
   const payload = { app: "minecraft-skin-library", version: 1, exported: new Date().toISOString(), skins: state.skins };
@@ -440,6 +489,7 @@ function setupDetail() {
   toggle("dRegions", async on => { regionsOn = on; const s = byId(state.current); if (s) drawTexture($("dTex"), await imageOf(s), on); });
   on("dExport", "click", () => { const s = byId(state.current); if (s) download(s.data, safeName(s.name) + ".png"); });
   on("dPfp", "click", () => { const s = byId(state.current); if (s) openPfp(s); });
+  on("dShare", "click", () => { const s = byId(state.current); if (s) openShare(s); });
   on("dDup", "click", async () => {
     const s = byId(state.current); if (!s) return;
     const now = Date.now();
@@ -577,6 +627,14 @@ async function boot() {
   window.__skinLibraryBooted = true;
   try { state.skins = await db.all(); } catch (e) { state.skins = []; toast(t("storageError"), true); }
   safe("grid", renderGrid);
+  safe("share", () => {
+    on("shCopy", "click", copyShareLink);
+    on("shClose", "click", () => $("shareDlg").close());
+    on("shSaveQr", "click", () => saveWithPreview({ title: t("shareQr"), filename: ($("shareDlg").dataset.name || "skin").replace(/[^\w\-]+/g, "_") + "-qr.png", make: () => canvasBlob($("shQr")) }));
+    on("sdCancel", "click", () => $("sharedDlg").close());
+    addEventListener("hashchange", checkSharedLink);
+    checkSharedLink();
+  });
 }
 
 boot();

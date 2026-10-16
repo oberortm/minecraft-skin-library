@@ -366,3 +366,11 @@ h3 { margin: 0; font: 500 11px var(--f-mono); text-transform: uppercase; letter-
 .pfp-row .seg { flex-wrap: wrap; }
 .pfp-row select[hidden], .pfp-row input[hidden] { display: none; }
 #pfpTextValue { min-width: 0; width: 150px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: inherit; font: inherit; }
+
+/* share dialog */
+.sh-row { flex-wrap: nowrap; gap: 8px; }
+#shLink { flex: 1; min-width: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: inherit; font: 12px ui-monospace, monospace; }
+.sh-qr { display: grid; justify-items: center; gap: 10px; }
+.sh-qr canvas { width: min(320px, 100%); height: auto; image-rendering: pixelated; border-radius: 10px; }
+.sd-body { display: grid; grid-template-columns: minmax(0, 220px) minmax(0, 1fr); gap: 16px; align-items: center; }
+@media (max-width: 520px) { .sd-body { grid-template-columns: minmax(0, 1fr); } }
