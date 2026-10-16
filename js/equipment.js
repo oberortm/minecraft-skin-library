@@ -259,6 +259,22 @@ export function itemFiles() {
   return out;
 }
 
+/**
+ * A longer shaft for spear and trident: the diagonal shaft piece just above the end is repeated
+ * towards the bottom left, and the end piece moves to the new end. Returns the bigger canvas and how
+ * many pixels (at the sprite's own scale) were added.
+ */
+function longShaft(cv) {
+  const N = cv.width, b = Math.max(1, Math.round(N * 3 / 16)), E = 3 * b, M = N + E;
+  const c = document.createElement("canvas"); c.width = c.height = M;
+  const x = c.getContext("2d"); x.imageSmoothingEnabled = false;
+  x.drawImage(cv, E, 0);
+  x.clearRect(E, N - b, b, b);                                     // the old end piece
+  for (let i = 1; i <= 3; i++) x.drawImage(cv, b, N - 2 * b, b, b, E - i * b + b, N - b + i * b - b, b, b);
+  x.drawImage(cv, 0, N - b, b, b, 0, M - b, b, b);                 // the end piece at the new end
+  return { cv: c, ext: E, n: N };
+}
+
 /** Turn a sprite into a solid 1-pixel-thick model, like the game shows held items. 16 units wide. */
 function extrude(cv, THREE) {
   const N = cv.width, data = cv.getContext("2d").getImageData(0, 0, N, N).data, pu = 16 / N;
@@ -349,11 +365,20 @@ export function applyItems(viewer, THREE, hands, pack) {
       flip.add(a, b); holder.add(flip); meshes.push(a, b);
     } else {
       const key = ITEMS[h.item] ? `item_${h.item}_${h.mat}` : `item_${h.item}`;
-      const cv = (pack && pack[key]) || drawItem(h.item, h.mat);
+      let cv = (pack && pack[key]) || drawItem(h.item, h.mat), ext = 0, n = cv.width;
+      const long = h.item === "spear" || h.item === "trident";
+      if (long) ({ cv, ext, n } = longShaft(cv));
       const geo = extrude(cv, THREE);
       const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: tex(cv), roughness: 0.6 }));
       // the sprite as the game builds it: x 0..16, y 0..16 with the top of the picture up, 1 px thick around z = 8
       mesh.position.set(0, 16, 8);
+      if (long) {
+        // the bigger picture keeps the pixel size; the original part stays where it was, the new shaft
+        // continues behind the hand
+        const k = cv.width / n;
+        mesh.scale.set(k, k, 1);
+        mesh.position.x = -ext * 16 / n;
+      }
       // the big spear and trident keep the thickness of a normal item
       if (h.item === "spear" || h.item === "trident") mesh.scale.z = 0.85 / 0.9;
       holder.add(mesh); meshes.push(mesh);
@@ -362,7 +387,7 @@ export function applyItems(viewer, THREE, hands, pack) {
       const t = glintTex();
       for (const m of meshes) {
         const g = new THREE.Mesh(m.geometry, glintMat(t));
-        g.position.copy(m.position);
+        g.position.copy(m.position); g.scale.copy(m.scale);
         g.material.polygonOffset = true; g.material.polygonOffsetFactor = -1; g.material.polygonOffsetUnits = -1;
         g.onBeforeRender = () => { t.offset.set((performance.now() / 6000) % 1, (performance.now() / 9000) % 1); };
         m.parent.add(g);
