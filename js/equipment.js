@@ -211,9 +211,9 @@ const DISPLAY = {
   shield: { r: [0, 90, 0], t: [10, 6, -4], s: 1 },
 };
 for (const k of ["sword", "axe", "pickaxe", "mace"]) DISPLAY[k] = DISPLAY.handheld;
-// spear and trident: about the size of a sword, tip raised forwards, held a little below the middle of the shaft
+// spear and trident: sword-sized head, long shaft, held a little behind the middle (about 40 % from the end), tip raised forwards
 // (fix: shift in the arm's space so that point of the shaft sits in the fist)
-DISPLAY.spear = DISPLAY.trident = { r: [0, -90, 30], t: [0, 4, 0.5], s: 0.9, fix: [0, 1.9, -4.6] };
+DISPLAY.spear = DISPLAY.trident = { r: [0, -90, 20], t: [0, 4, 0.5], s: 0.9, fix: [0, 5, 1] };
 for (const k of ["totem", "torch", "map"]) DISPLAY[k] = DISPLAY.generated;
 
 /**
