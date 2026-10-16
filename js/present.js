@@ -6,6 +6,7 @@ import { load3d, pixelRatio } from "./view3d.js";
 import { loadEquipment, saveEquipment, applyElytra, applyArmor, ARMOR_SLOTS, ARMOR_MATS, TRIM_PATTERNS, TRIM_MATS, applyItems, ITEMS, TOOL_MATS } from "./equipment.js";
 import { EMOTES, emoteAnimations } from "./emotes.js";
 import { buildFilm, trailer, videoType } from "./cinema.js";
+import { saveWithPreview, canvasBlob } from "./saver.js";
 import { readPack, packCanvases, savePack, loadPack, clearPack, SOURCES, downloadSource, selectedSource, selectSource, packStale, downloadable } from "./pack.js";
 const KEY = "skin-library-present";
 const QUALITY_KEY = "skin-library-mc-quality";
@@ -64,14 +65,18 @@ async function initViewer() {
     v.zoom = 0.66;
     v.fov = 38;
     st.base = { amb: v.globalLight.intensity, cam: v.cameraLight.intensity };
-    new ResizeObserver(() => {
+    st.syncSize = () => {
       const r = $("prStage").getBoundingClientRect();
       if (!r.width) return;
+      if (r.width === v.width && r.height === v.height) return;
       v.setSize(r.width, r.height);
-      // keep the whole figure (and a group) in view on tall, narrow screens
-      if (st.world) v.zoom = Math.min(0.66, 0.66 * (r.width / r.height) / 0.95);
-      else fitGroupCamera();
-    }).observe($("prStage"));
+      // classic: keep the whole figure (and a group) in view on tall, narrow screens. A block world keeps
+      // its camera: skinview3d's zoom would move it towards the world origin, sometimes into the hills
+      if (!st.world) fitGroupCamera();
+      // draw at once, so the canvas is never shown stretched to the new size
+      v.render();
+    };
+    new ResizeObserver(() => st.syncSize()).observe($("prStage"));
     st.viewer = v;
     bindSkinDrag(v, kit.THREE);
   } catch (e) { console.error("[skin-library] presentation 3D failed:", e); st.viewer = null; }
@@ -155,9 +160,30 @@ async function applyEquipment() {
     if (kit && st.viewer === v) {
       applyArmor(v, kit.THREE, st.equip.armor, st.packTex);
       applyItems(v, kit.THREE, st.equip.hands, st.packTex);
+      for (const f of st.groupFigs || []) dressGroupFig(f, kit.THREE);
     }
   } catch (e) { console.error("[skin-library] equipment failed:", e); }
   if (st.world) st.world.skinChanged();
+  syncGroupColors();
+}
+/** A group figure wears what the main figure wears: elytra (shared texture), armour and items. */
+function dressGroupFig(f, THREE) {
+  const v = st.viewer, fake = { playerObject: f.po };
+  const elytra = (st.equip.elytra || st.cineElytra) && v.capeTexture;
+  if (elytra) { f.po.elytra.map = v.capeTexture; f.po.backEquipment = "elytra"; } else f.po.backEquipment = null;
+  applyArmor(fake, THREE, st.equip.armor, st.packTex);
+  applyItems(fake, THREE, st.equip.hands, st.packTex);
+}
+/** Armour and item textures of group figures follow the colour handling of the scene, like the main one's. */
+function syncGroupColors() {
+  const T = st.groupTHREE;
+  if (!T) return;
+  for (const f of st.groupFigs || []) f.po.traverse(o => {
+    if (!o.isMesh) return;
+    o.castShadow = !!st.world && o.material.blending === T.NormalBlending;
+    const m = o.material.map;
+    if (m && m.userData.equipment) { m.colorSpace = st.world ? T.SRGBColorSpace : T.NoColorSpace; m.needsUpdate = true; }
+  });
 }
 function syncEquipUi() {
   $("eqElytra").checked = !!st.equip.elytra;
@@ -494,7 +520,7 @@ async function startCine(kind) {
     },
     world: () => st.world,
     started: c => { st.cineObj = c; },
-    done: async () => {
+    done: async recorded => {
       if (done) return;
       done = true;
       st.cine = null; st.cineObj = null;
@@ -513,6 +539,8 @@ async function startCine(kind) {
       await applyEquipment();
       if (saved.group) setGroupOn(true);
       wake();
+      // the recorded film: preview and save
+      if (recorded) saveWithPreview({ title: t("saveVideo"), filename: recorded.filename, make: async () => recorded.blob });
     },
   };
   st.cine = true;
@@ -574,37 +602,42 @@ function paintClassicBg(ctx, w, h) {
   const fx = $("prFx");
   if (fx.width) ctx.drawImage(fx, 0, 0, w, h);
 }
-/** Render the scene once at a higher resolution and save it as PNG. */
+/** Render the scene once at a higher resolution; the save window shows progress and a preview. */
 async function takePhoto() {
   const v = st.viewer;
   if (!v) return;
-  const p = photoPrefs(), mc = !!st.world, clear = !mc && p.bg === "clear";
-  const r = v.renderer, pr0 = r.getPixelRatio();
-  const css = v.canvas.getBoundingClientRect();
-  // stay within what the GPU can hold
-  const maxTex = Math.min(8192, r.capabilities.maxTextureSize || 4096);
-  const scale = Math.min(Number(p.size) || 1, maxTex / (Math.max(css.width, css.height) * pr0));
-  const out = document.createElement("canvas");
-  try {
-    r.setPixelRatio(pr0 * scale); v.updateComposerSize();
-    v.render();
-    out.width = v.canvas.width; out.height = v.canvas.height;
-    const ctx = out.getContext("2d");
-    if (!mc && !clear) paintClassicBg(ctx, out.width, out.height);
-    ctx.drawImage(v.canvas, 0, 0);   // right after rendering, before the frame is handed to the screen
-  } finally {
-    r.setPixelRatio(pr0); v.updateComposerSize(); v.render();
-  }
   const skin = st.list[st.i];
-  out.toBlob(b => {
-    const url = URL.createObjectURL(b), a = document.createElement("a");
-    a.href = url; a.download = `${(skin ? skin.name : "skin").replace(/[^\w\-]+/g, "_")}-${st.scene}.png`;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 2000);
-  }, "image/png");
   // a short flash as feedback
   const f = document.querySelector(".pr-flash");
   if (f && !reduce()) { f.classList.remove("on"); void f.offsetWidth; f.classList.add("on"); setTimeout(() => f.classList.remove("on"), 450); }
+  await saveWithPreview({
+    title: t("savePhoto"),
+    filename: `${(skin ? skin.name : "skin").replace(/[^\w\-]+/g, "_")}-${st.scene}.png`,
+    make: async progress => {
+      const p = photoPrefs(), mc = !!st.world, clear = !mc && p.bg === "clear";
+      const r = v.renderer, pr0 = r.getPixelRatio();
+      const css = v.canvas.getBoundingClientRect();
+      // stay within what the GPU can hold
+      const maxTex = Math.min(8192, r.capabilities.maxTextureSize || 4096);
+      const scale = Math.min(Number(p.size) || 1, maxTex / (Math.max(css.width, css.height) * pr0));
+      const out = document.createElement("canvas");
+      progress(0.15);
+      try {
+        r.setPixelRatio(pr0 * scale); v.updateComposerSize();
+        v.render();
+        out.width = v.canvas.width; out.height = v.canvas.height;
+        const ctx = out.getContext("2d");
+        if (!mc && !clear) paintClassicBg(ctx, out.width, out.height);
+        ctx.drawImage(v.canvas, 0, 0);   // right after rendering, before the frame is handed to the screen
+      } finally {
+        r.setPixelRatio(pr0); v.updateComposerSize(); v.render();
+      }
+      progress(0.6);
+      const blob = await canvasBlob(out);
+      progress(1);
+      return blob;
+    },
+  });
 }
 
 // ---------- group photo: up to four more skins beside the figure ----------
@@ -634,6 +667,8 @@ function renderGroupList() {
 function clearGroup() {
   for (const g of st.groupFigs || []) {
     if (g.holder && g.holder.parent) g.holder.parent.remove(g.holder);
+    // free the armour and item meshes too
+    if (st.groupTHREE) { applyArmor({ playerObject: g.po }, st.groupTHREE, {}, null); applyItems({ playerObject: g.po }, st.groupTHREE, {}, null); }
     g.tex.dispose();
   }
   st.groupFigs = [];
@@ -664,7 +699,7 @@ async function buildGroup() {
     const po = new sv.PlayerObject();
     po.skin.map = tex;
     po.skin.modelType = s.model === "slim" ? "slim" : "default";
-    po.cape.visible = false; po.elytra.visible = false; if (po.ears) po.ears.visible = false;
+    po.backEquipment = null; if (po.ears) po.ears.visible = false;
     po.position.set(0, 0, 0);
     const holder = new THREE.Group();
     holder.position.set(slots[i][0], 0, slots[i][1]);
@@ -675,6 +710,8 @@ async function buildGroup() {
     figs.push({ po: po, holder, tex, phase: 0.37 * (i + 1), anim: st.motion ? makeAnim(st.anim, 0.37 * (i + 1)) : null, model: s.model });
   }
   st.groupFigs = figs;
+  for (const f of figs) dressGroupFig(f, THREE);
+  syncGroupColors();
   let last = performance.now();
   const loop = now => {
     const dt = Math.min(0.1, (now - last) / 1000); last = now;
@@ -699,8 +736,8 @@ function syncGroupLook() {
   for (const f of st.groupFigs || []) {
     if (kitTHREE) f.tex.colorSpace = st.world ? kitTHREE.SRGBColorSpace : kitTHREE.NoColorSpace;
     f.tex.needsUpdate = true;
-    f.po.traverse(o => { if (o.isMesh) o.castShadow = !!st.world; });
   }
+  syncGroupColors();
   fitGroupCamera();
 }
 /** Step the camera back so the whole group fits; back to normal without one. */
@@ -824,8 +861,27 @@ function fillInfo(skin) {
   $("prCount").textContent = `${String(st.i + 1).padStart(2, "0")} / ${String(n).padStart(2, "0")}`;
   $("prName").textContent = skin.name;
   $("prMeta").textContent = skin.model === "slim" ? t("modelSlim") : t("modelClassic");
+  syncFavStar(skin);
   const big = $("prBig");
   big.replaceChildren(...[0, 1].map(() => { const s = document.createElement("span"); s.textContent = skin.name + " · "; return s; }));
+}
+
+/** The star next to the name: filled for favourites. */
+function syncFavStar(skin) {
+  const b = $("prFav");
+  b.hidden = !st.onFav;
+  b.setAttribute("aria-pressed", String(!!skin.fav));
+  b.querySelector("use").setAttribute("href", skin.fav ? "#i-star" : "#i-star-o");
+  b.dataset.i18nTitle = skin.fav ? "unfav" : "fav";
+  b.title = t(b.dataset.i18nTitle); b.setAttribute("aria-label", b.title);
+}
+async function toggleFav() {
+  const skin = st.list[st.i];
+  if (!skin || !st.onFav) return;
+  await st.onFav(skin);
+  syncFavStar(skin);
+  const b = $("prFav");
+  if (!reduce()) { b.classList.remove("pop"); void b.offsetWidth; b.classList.add("pop"); }
 }
 
 async function show(i, dir = 0) {
@@ -890,7 +946,8 @@ export function presenting() { return st.on; }
 /** Read-only look at the presentation state, for automated tests. */
 export const presentDebug = () => st;
 
-export async function startPresentation(list, startIndex = 0, onExit) {
+export async function startPresentation(list, startIndex = 0, onExit, onFav = null) {
+  st.onFav = onFav;
   if (!list.length) return;
   prefs();
   st.motion = !reduce();
@@ -961,6 +1018,7 @@ export function setupPresentation() {
     return b;
   }));
   $("prPhoto").addEventListener("click", () => toggleExtra("prPhotoPanel", "prPhoto"));
+  $("prFav").addEventListener("click", toggleFav);
   $("prCineBtn").addEventListener("click", () => {
     toggleExtra("prCinePanel", "prCineBtn");
     const ok = !!videoType();
@@ -996,7 +1054,11 @@ export function setupPresentation() {
     b.title = t(b.dataset.i18nTitle); b.setAttribute("aria-label", b.title);
     b.setAttribute("aria-pressed", String(full));
   };
-  document.addEventListener("fullscreenchange", syncFull);
+  document.addEventListener("fullscreenchange", () => {
+    syncFull();
+    // the browser resizes in steps while switching: measure again until it settles
+    if (st.syncSize) for (const ms of [0, 60, 200, 500]) setTimeout(() => st.syncSize && st.syncSize(), ms);
+  });
   $("prFull").addEventListener("click", () => {
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
     else document.documentElement.requestFullscreen?.().catch(() => {});
@@ -1042,7 +1104,12 @@ export function setupPresentation() {
   }, true);
   document.addEventListener("pointermove", e => {
     if (!st.on) return;
-    if (e.clientY < 10) { openHeader(); return; }
+    // the header only comes down after the mouse has rested at the top edge for a moment
+    if (e.clientY < 10) {
+      if (!document.body.classList.contains("hdr-open") && !st.hdrWait) st.hdrWait = setTimeout(() => { st.hdrWait = 0; openHeader(); }, 800);
+      return;
+    }
+    if (st.hdrWait) { clearTimeout(st.hdrWait); st.hdrWait = 0; }
     // moving clearly away below the open header closes it again (however it was opened)
     if (e.pointerType === "mouse" && document.body.classList.contains("hdr-open")) {
       const bottom = document.querySelector(".top").getBoundingClientRect().bottom;
@@ -1062,6 +1129,7 @@ export function setupPresentation() {
     else if (e.key === "Escape" && !$("prEquipPanel").hidden) toggleEquipPanel(false);
     else if (e.key === "Escape" && ["prPhotoPanel", "prGroupPanel", "prEmotes"].some(id => !$(id).hidden)) closeExtraPanels();
     else if (e.key.toLowerCase() === "p" && !e.ctrlKey && !e.metaKey) takePhoto();
+    else if (e.key.toLowerCase() === "f" && !e.ctrlKey && !e.metaKey) toggleFav();
     else if (e.key === "Escape" && document.body.classList.contains("hdr-open")) closeHeader();
     else if (e.key === "Escape" && !document.fullscreenElement) stopPresentation();
     else if (e.key === " ") { e.preventDefault(); applyRotate(!st.rotate); }

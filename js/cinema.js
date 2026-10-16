@@ -84,10 +84,7 @@ export class Cinema {
     await new Promise(r => { rec.onstop = r; rec.stop(); });
     const ext = this.recType.includes("mp4") ? "mp4" : "webm";
     const blob = new Blob(this.chunks, { type: this.recType.split(";")[0] });
-    const url = URL.createObjectURL(blob), a = document.createElement("a");
-    a.href = url; a.download = `${(this.h.skin.name || "skin").replace(/[^\w\-]+/g, "_")}-${this.kind}.${ext}`;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    return { blob, filename: `${(this.h.skin.name || "skin").replace(/[^\w\-]+/g, "_")}-${this.kind}.${ext}` };
   }
   /** Seconds since the start. */
   now() { return (performance.now() - this.t0) / 1000; }
@@ -132,7 +129,7 @@ export class Cinema {
     v.render = this.prevRender;
     const o = this.h.overlay; o.getContext("2d").clearRect(0, 0, o.width, o.height);
     this.cleanup && this.cleanup();
-    this.stopRecording().finally(() => { this.h.done(); this.resolve && this.resolve(); });
+    this.stopRecording().catch(() => null).then(rec => { this.h.done(rec); this.resolve && this.resolve(); });
   }
 
   // ---------- camera helpers ----------

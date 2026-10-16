@@ -217,7 +217,7 @@
   <button class="pr-nav next" id="prNext" data-i18n-title="next"><svg class="ic"><use href="#i-right"/></svg></button>
   <div class="pr-info">
     <div class="pr-count" id="prCount"></div>
-    <h2 class="pr-name" id="prName"></h2>
+    <div class="pr-name-row"><h2 class="pr-name" id="prName"></h2><button class="pr-fav" id="prFav" type="button" aria-pressed="false" data-i18n-title="fav"><svg class="ic"><use href="#i-star-o"/></svg></button></div>
     <div class="pr-meta" id="prMeta"></div>
   </div>
   <div class="pr-controls">
@@ -281,6 +281,26 @@
         <label class="notes"><h3 data-i18n="notes"></h3><textarea id="dNotes" rows="3" data-i18n-ph="notesPh"></textarea></label>
         <p class="hint" id="dAdded"></p>
       </div>
+    </div>
+  </div>
+</dialog>
+
+<!-- Saving a picture or video: progress, then preview + save -->
+<dialog id="saver" class="sheet narrow saver" aria-labelledby="svTitle">
+  <div class="sheet-inner">
+    <div class="sheet-top"><h2 class="sheet-title" id="svTitle"></h2><span class="spacer"></span>
+      <button class="btn icon-only" id="svX" data-i18n-title="close"><svg class="ic"><use href="#i-x"/></svg></button></div>
+    <div id="svBusy" class="sv-busy"><p id="svMsg"></p><div class="sv-progress"><progress id="svBar" max="1"></progress><span id="svPct"></span></div></div>
+    <p class="hint err" id="svErr" hidden data-i18n="saveFailed"></p>
+    <div id="svDone" class="sv-done" hidden>
+      <div class="sv-preview"><img id="svImg" alt=""><video id="svVid" controls loop muted playsinline hidden></video></div>
+      <p class="hint" id="svInfo"></p>
+      <div class="row">
+        <a class="btn primary" id="svSave" href="#" download><svg class="ic"><use href="#i-upload"/></svg><span data-i18n="saveFile"></span></a>
+        <button class="btn" id="svShare" type="button" hidden data-i18n="shareFile"></button>
+        <button class="btn" id="svClose" type="button" data-i18n="close"></button>
+      </div>
+      <p class="hint" id="svSaved" hidden data-i18n="saveStarted"></p>
     </div>
   </div>
 </dialog>
@@ -437,6 +457,7 @@
     "./js/edextra.js": "./js/edextra.js?v=50",
     "./js/emotes.js": "./js/emotes.js?v=50",
     "./js/cinema.js": "./js/cinema.js?v=50",
+    "./js/saver.js": "./js/saver.js?v=50",
     "./js/mcworld.js": "./js/mcworld.js?v=50",
     "skinview3d": "./vendor/skinview3d@3.0.1/skinview3d.js",
     "skinview-utils": "./vendor/skinview-utils@0.7.1/index.js",
@@ -480,6 +501,7 @@
 <link rel="modulepreload" href="js/edextra.js?v=50">
 <link rel="modulepreload" href="js/emotes.js?v=50">
 <link rel="modulepreload" href="js/cinema.js?v=50">
+<link rel="modulepreload" href="js/saver.js?v=50">
 <link rel="modulepreload" href="js/pack.js?v=50">
 <script type="module" src="js/app.js?v=50"></script>
 </body>

@@ -893,8 +893,13 @@ export class McWorld {
     const mirrorPos = new THREE.Vector3(), camPos = new THREE.Vector3(), normal = new THREE.Vector3(), rot = new THREE.Matrix4();
     const view = new THREE.Vector3(), look = new THREE.Vector3(), target = new THREE.Vector3();
     w.material = this.waterFancy;
+    const want = new THREE.Vector2();
     w.onBeforeRender = (renderer, scene, camera) => {
       if (self.inReflection) return;
+      // follow the canvas size (full screen, rotated phone): the mirror image stays sharp
+      renderer.getDrawingBufferSize(want);
+      const rw = Math.max(256, want.x >> 1), rh = Math.max(256, want.y >> 1);
+      if (self.reflectRT.width !== rw || self.reflectRT.height !== rh) self.reflectRT.setSize(rw, rh);
       mirrorPos.setFromMatrixPosition(w.matrixWorld);
       camPos.setFromMatrixPosition(camera.matrixWorld);
       rot.extractRotation(w.matrixWorld);

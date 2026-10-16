@@ -9,6 +9,7 @@ import { $, on, safe, setErrorReporter } from "./dom.js";
 import { load3d, pixelRatio } from "./view3d.js";
 import { isPlayerName, lookupPlayer } from "./player.js";
 import { openPfp, setupPfp } from "./pfp.js";
+import { setupSaver } from "./saver.js";
 
 // filters: slim/classic are "either", fav narrows to favourites; none active = all
 const state = { skins: [], view: "front", filters: { slim: false, classic: false, fav: false }, sort: "new", search: "", current: null };
@@ -506,7 +507,7 @@ function present(startId) {
   if (!list.length) return;
   const i = Math.max(0, list.findIndex(s => s.id === startId));
   if ($("detail").open) $("detail").close();
-  startPresentation(list, i, () => renderGrid());
+  startPresentation(list, i, () => renderGrid(), skin => updateSkin(skin, { fav: !skin.fav }));
 }
 
 function drawEmptyFigure() {
@@ -532,6 +533,7 @@ async function boot() {
   safe("i18n", () => applyI18n());
   safe("title", () => { splitTitle(document.querySelector(".top h1")); trackScroll(); });
   safe("pfp", setupPfp);
+  safe("saver", setupSaver);
   safe("toolbar", () => {
     seg("viewSeg", state.view, v => { state.view = v; saveUi(); renderGrid(); });
     setupFilters();

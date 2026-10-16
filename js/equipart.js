@@ -223,9 +223,10 @@ const PAPER = ["#4f4430", "#9d8a62", "#d9c99e", "#ebe0bd", "#fbf5df"];
  * A small sprite painter: cells hold [palette, tone]; at the end every empty pixel next to a cell
  * gets that palette's outline tone (the dark rim of the game's item art), unless the cell says not to.
  */
-function sprite(draw) {
+function sprite(draw, flipY = false) {
   const cells = new Map();
-  const set = (x, y, pal, t, rim = true) => { if (x >= 0 && y >= 0 && x < 16 && y < 16) cells.set(x + y * 16, [pal, t, rim]); };
+  // flipY: drawn upside down, so the picture matches the game's sprite (the bow's limbs run the other way)
+  const set = (x, y, pal, t, rim = true) => { if (flipY) y = 15 - y; if (x >= 0 && y >= 0 && x < 16 && y < 16) cells.set(x + y * 16, [pal, t, rim]); };
   draw(set);
   const [c, ctx] = canvas(16, 16);
   const rim = new Map();
@@ -313,7 +314,7 @@ export function drawItem(item, mat) {
         if (!grip) set(x2, y2, HANDLE, 2);
       }
       for (let x = 4; x <= 12; x++) set(x, 16 - x, PAPER, 4, false);                        // string
-    });
+    }, true);
     case "crossbow": return sprite(set => {
       diag(set, 1, 11, 0, HANDLE, 2); diag(set, 2, 11, 1, HANDLE, 1); diag(set, 9, 13, -1, HANDLE, 3);
       for (let k = -5; k <= 5; k++) { const b = Math.floor(Math.abs(k) / 2.5); set(9 + k - b, 6 + k + b, HANDLE, Math.abs(k) > 3 ? 4 : 3); }

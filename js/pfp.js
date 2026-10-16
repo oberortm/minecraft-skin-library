@@ -4,6 +4,7 @@ import { t } from "./i18n.js";
 import { $ } from "./dom.js";
 import { load3d } from "./view3d.js";
 import { loadImage, renderFigure, legacyTo64 } from "./skin.js";
+import { saveWithPreview, canvasBlob } from "./saver.js";
 
 const KEY = "skin-library-pfp";
 const st = { skin: null, img: null, viewer: null, kit: null, seq: 0, opts: null };
@@ -178,15 +179,18 @@ export function setupPfp() {
     // free the WebGL context; the next picture builds a new one
     if (st.viewer) { st.viewer.dispose(); st.viewer = null; st.loaded = null; }
   });
-  $("pfpSave").addEventListener("click", async () => {
-    const c = st.last || await compose();
-    c.toBlob(b => {
-      const url = URL.createObjectURL(b), a = document.createElement("a");
-      a.href = url; a.download = `${(st.skin.name || "skin").replace(/[^\w\-]+/g, "_")}-${st.opts.crop}-${st.opts.size}.png`;
-      document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 2000);
-    }, "image/png");
-  });
+  $("pfpSave").addEventListener("click", () => saveWithPreview({
+    title: t("pfpTitle"),
+    filename: `${(st.skin.name || "skin").replace(/[^\w\-]+/g, "_")}-${st.opts.crop}-${st.opts.size}.png`,
+    make: async progress => {
+      progress(0.2);
+      const c = await compose();
+      progress(0.7);
+      const b = await canvasBlob(c);
+      progress(1);
+      return b;
+    },
+  }));
 }
 
 /** For automated tests. */

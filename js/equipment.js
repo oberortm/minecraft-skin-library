@@ -198,8 +198,46 @@ export const TOOL_MATS = ["wood", "stone", "copper", "iron", "gold", "diamond", 
 /** Every item, with whether it comes in tool materials. Both hands can hold any of them. */
 export const ITEMS = { sword: true, axe: true, pickaxe: true, spear: true, mace: false, trident: false, bow: false, crossbow: false, shield: false, totem: false, torch: false, map: false };
 export function emptyHand() { return { item: null, mat: "iron", glint: false }; }
-/** Where the hand grips each 16x16 sprite (x, y in pixels). */
-const GRIP = { sword: [3, 12.5], axe: [3, 12.5], pickaxe: [3, 12.5], spear: [4, 11.5], mace: [3.5, 12], trident: [4, 11.5], bow: [9.5, 9.5], crossbow: [5, 10.5], totem: [8, 13], torch: [8, 14], map: [8, 12] };
+/**
+ * Third-person display of the item models, as in the game's model files: rotation (degrees, XYZ),
+ * translation (pixels) and scale for the right hand; the left hand mirrors them.
+ */
+const DISPLAY = {
+  handheld: { r: [0, -90, 55], t: [0, 4, 0.5], s: 0.85 },
+  generated: { r: [0, 0, 0], t: [0, 3, 1], s: 0.55 },
+  bow: { r: [-80, 260, -40], t: [-1, -2, 2.5], s: 0.9 },
+  // the crossbow rests level in the hand, pointing ahead
+  crossbow: { r: [0, -90, 45], t: [0, 2, 1], s: 0.9 },
+  shield: { r: [0, 90, 0], t: [10, 6, -4], s: 1 },
+};
+for (const k of ["sword", "axe", "pickaxe", "spear", "mace", "trident"]) DISPLAY[k] = DISPLAY.handheld;
+for (const k of ["totem", "torch", "map"]) DISPLAY[k] = DISPLAY.generated;
+
+/**
+ * From the arm's pivot (shoulder) to the item's 16x16x16 model box, following the game: the game's model
+ * space has y down and the face at -z, which is skinview3d's space turned half round the x axis.
+ */
+function heldMatrix(THREE, left, d, shield = false) {
+  const m = rightHeld(THREE, d);
+  if (!left) return m;
+  // the left hand is the mirror image of the right. A second mirror inside the item keeps the faces the
+  // right way out: through the thickness of a flat sprite (looks the same), across the width of the shield
+  const inner = shield ? new THREE.Matrix4().makeScale(-1, 1, 1)
+    : new THREE.Matrix4().makeTranslation(0, 0, 16).multiply(new THREE.Matrix4().makeScale(1, 1, -1));
+  return new THREE.Matrix4().makeScale(-1, 1, 1).multiply(m).multiply(inner);
+}
+function rightHeld(THREE, d) {
+  const D = Math.PI / 180, k = 1, m = new THREE.Matrix4(), t = new THREE.Matrix4();
+  m.makeRotationX(Math.PI);                                                   // game model space -> skinview3d
+  m.multiply(t.makeRotationX(-90 * D));
+  m.multiply(t.makeRotationY(Math.PI));
+  m.multiply(t.makeTranslation(k, 2, -10));                                   // into the fist
+  m.multiply(t.makeTranslation(k * d.t[0], d.t[1], d.t[2]));
+  m.multiply(t.makeRotationFromEuler(new THREE.Euler(d.r[0] * D, k * d.r[1] * D, k * d.r[2] * D, "XYZ")));
+  m.multiply(t.makeScale(d.s, d.s, d.s));
+  m.multiply(t.makeTranslation(-8, -8, -8));
+  return m;
+}
 
 /** File names in the game's textures (new names, then 1.8-1.12). */
 export function itemFiles() {
@@ -242,8 +280,19 @@ function extrude(cv, THREE) {
   return geo;
 }
 
+/** Turn the arm (the group with its meshes and armour) about the shoulder, independent of animations. */
+function liftArm(part, angle) {
+  const pivot = part.children.find(o => o.isGroup && o.children.some(c => c.isMesh));
+  if (!pivot) return;
+  if (!pivot.userData.rest) pivot.userData.rest = pivot.position.clone();
+  const r = pivot.userData.rest, c = Math.cos(angle), s = Math.sin(angle);
+  pivot.position.set(r.x, r.y * c - r.z * s, r.y * s + r.z * c);
+  pivot.rotation.x = angle;
+}
 /** Remove the held items. */
 function clearItems(viewer) {
+  const sk = viewer.playerObject.skin;
+  for (const part of [sk.rightArm, sk.leftArm]) liftArm(part, 0);
   for (const m of viewer.playerObject.userData.items || []) {
     m.parent && m.parent.remove(m);
     m.traverse(o => { if (o.isMesh) { o.geometry.dispose(); if (o.material.map && o.material.map.userData.own) o.material.map.dispose(); o.material.dispose(); } });
@@ -269,62 +318,51 @@ export function applyItems(viewer, THREE, hands, pack) {
     const g = new THREE.MeshBasicMaterial({ map: t, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false });
     return g;
   };
-  for (const [hand, part, side] of [["main", skin.rightArm, -1], ["off", skin.leftArm, 1]]) {
+  for (const [hand, part] of [["main", skin.rightArm], ["off", skin.leftArm]]) {
     const h = hands && hands[hand];
     if (!h || !h.item || !(h.item in ITEMS)) continue;
-    const pivot = part.children.find(o => o.isGroup) || part;
+    const left = hand === "off";
+    // the game's chain from shoulder to item: hand offset, then the item model's third-person display
     const holder = new THREE.Group();
-    let meshes = [];
+    holder.matrixAutoUpdate = false;
+    holder.matrix.copy(heldMatrix(THREE, left, DISPLAY[h.item] || DISPLAY.handheld, h.item === "shield"));
+    // as in the game, an arm that holds something is lifted a little forwards (18 degrees at the shoulder)
+    const lift = new THREE.Group();
+    lift.rotation.x = -Math.PI / 10;
+    lift.add(holder);
+    liftArm(part, -Math.PI / 10);
+    const meshes = [];
     if (h.item === "shield") {
       const t = tex((pack && pack.shield) || drawShield());
       const mat = new THREE.MeshStandardMaterial({ map: t, alphaTest: 0.1, roughness: 0.7 });
+      // the shield model: plate -6..6 x -11..11 x -2..-1, handle -1..1 x -3..3 x -1..5, drawn upside down and back to front
+      const flip = new THREE.Group();
+      flip.scale.set(1, -1, -1);
       const plate = new THREE.BoxGeometry(12, 22, 1); boxUVs(plate, 0, 0, 12, 22, 1, 64, 64);
       const grip = new THREE.BoxGeometry(2, 6, 6); boxUVs(grip, 26, 0, 2, 6, 6, 64, 64);
       const a = new THREE.Mesh(plate, mat), b = new THREE.Mesh(grip, mat);
-      a.position.set(0, 0, 3.5); b.position.set(0, 0, 0);
-      meshes = [a, b];
-      // held at the outer side of the arm, front facing forwards, slightly turned out
-      holder.scale.setScalar(0.62);
-      holder.position.set(side * 2.6, -4.5, 0.5);
-      holder.rotation.set(0, side * 0.25, 0);
+      a.position.set(0, 0, -1.5); b.position.set(0, 0, 2);
+      flip.add(a, b); holder.add(flip); meshes.push(a, b);
     } else {
       const key = ITEMS[h.item] ? `item_${h.item}_${h.mat}` : `item_${h.item}`;
       const cv = (pack && pack[key]) || drawItem(h.item, h.mat);
       const geo = extrude(cv, THREE);
       const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: tex(cv), roughness: 0.6 }));
-      const [gx, gy] = GRIP[h.item];
-      mesh.position.set(-gx, gy, 0);
-      const inner = new THREE.Group();
-      inner.add(mesh);
-      if (h.item === "map") {
-        // a map is held up with its face to the front
-        inner.rotation.set(0, 0, 0); holder.position.set(side * -0.5, -5.5, 2.5); holder.rotation.x = -0.5;
-      } else {
-        // sprite x -> forwards, so the tool points ahead of the figure, tilted a little down
-        inner.rotation.y = -Math.PI / 2;
-        holder.position.set(0, -5.2, 0.2); holder.rotation.x = 0.35;
-      }
-      holder.scale.setScalar(0.78);
-      holder.add(inner);
-      meshes = [mesh];
-      if (h.glint) {
-        const t = glintTex(), g = new THREE.Mesh(geo, glintMat(t));
-        g.position.copy(mesh.position); g.scale.setScalar(1.01);
-        g.onBeforeRender = () => { t.offset.set((performance.now() / 6000) % 1, (performance.now() / 9000) % 1); };
-        inner.add(g);
-      }
+      // the sprite as the game builds it: x 0..16, y 0..16 with the top of the picture up, 1 px thick around z = 8
+      mesh.position.set(0, 16, 8);
+      holder.add(mesh); meshes.push(mesh);
     }
-    if (h.item === "shield") for (const m of meshes) holder.add(m);
-    if (h.glint && h.item === "shield") {
+    if (h.glint) {
       const t = glintTex();
       for (const m of meshes) {
-        const g = new THREE.Mesh(m.geometry.clone(), glintMat(t));
-        g.position.copy(m.position); g.scale.setScalar(1.01);
+        const g = new THREE.Mesh(m.geometry, glintMat(t));
+        g.position.copy(m.position);
+        g.material.polygonOffset = true; g.material.polygonOffsetFactor = -1; g.material.polygonOffsetUnits = -1;
         g.onBeforeRender = () => { t.offset.set((performance.now() / 6000) % 1, (performance.now() / 9000) % 1); };
-        holder.add(g);
+        m.parent.add(g);
       }
     }
-    holder.traverse(o => { if (o.isMesh) o.castShadow = true; });
-    pivot.add(holder); list.push(holder);
+    holder.traverse(o => { if (o.isMesh) o.castShadow = o.material.blending === THREE.NormalBlending; });
+    part.add(lift); list.push(lift);
   }
 }
